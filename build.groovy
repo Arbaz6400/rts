@@ -15,7 +15,7 @@ pipeline {
                     extensions: [[$class: 'CleanBeforeCheckout']], // Optional
                     submoduleCfg: [],
                     userRemoteConfigs: [[
-                        url: 'https://github.com/your-org/streaming.git' // Change to your repo URL
+                        url: 'https://github.com/Arbaz6400/streaming.git' // Change to your repo URL
                     ]]
                 ])
             }
