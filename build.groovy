@@ -2,20 +2,14 @@ pipeline {
     agent any
 
     stages {
-        stage('Checkout Streaming Repo') {
+        stage('Checkout Remote Repo') {
             steps {
-                // Clean the workspace first (optional)
-                cleanWs()
-
-                // Clone the 'streaming' repository
                 checkout([
                     $class: 'GitSCM',
-                    branches: [[name: '*/main']], // Change to the branch you want
-                    doGenerateSubmoduleConfigurations: false,
-                    extensions: [[$class: 'CleanBeforeCheckout']], // Optional
-                    submoduleCfg: [],
+                    branches: [[name: '*/main']],
                     userRemoteConfigs: [[
-                        url: 'https://github.com/Arbaz6400/streaming.git' // Change to your repo URL
+                        url: 'https://github.com/your-org/streaming.git',
+                        credentialsId: 'github-token'
                     ]]
                 ])
             }
