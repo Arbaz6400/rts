@@ -1,18 +1,13 @@
-pipeline {
-    agent any
-
-    stages {
-        stage('Checkout Remote Repo') {
-            steps {
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: '*/main']],
-                    userRemoteConfigs: [[
-                        url: 'https://github.com/your-org/streaming.git',
-                        credentialsId: 'github-token'
-                    ]]
-                ])
+def run() {
+    pipeline {
+        agent any
+        stages {
+            stage('Build Stage') {
+                steps {
+                    echo "Running Build pipeline from RTS repo"
+                }
             }
         }
     }
 }
+return this
