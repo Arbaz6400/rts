@@ -10,13 +10,12 @@ node {
             userRemoteConfigs: [[url: 'https://github.com/Arbaz6400/rts.git']]
         ])
 
-        def scriptPath = "${scriptName}"
-        if (fileExists(scriptPath)) {
-            echo "Loading script from: ${scriptPath}"
-            def loadedScript = load(scriptPath)
-            loadedScript.executeBuild() // Call custom entry point
+        if (fileExists(scriptName)) {
+            echo "Loading and executing: ${scriptName}"
+            def loadedScript = load(scriptName)
+            loadedScript.executePipeline() // our custom entry point
         } else {
-            error "Script '${scriptPath}' not found in RTS repo"
+            error "Script '${scriptName}' not found in RTS repo"
         }
     }
 }
