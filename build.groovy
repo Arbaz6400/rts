@@ -1,7 +1,10 @@
-def runBuild() {
+def executePipeline() {
     stage('Build') {
-        echo "Building application..."
-        // your build steps here
+        echo "Building..."
+    }
+    stage('Test') {
+        echo "Running tests..."
     }
 }
+
 return this
