@@ -1,13 +1,10 @@
-def run() {
-    pipeline {
-        agent any
-        stages {
-            stage('Build') {
-                steps {
-                    echo "Running build from RTS repo"
-                }
-            }
-        }
+def executePipeline() {
+    stage('Build') {
+        echo "Building..."
+    }
+    stage('Test') {
+        echo "Running tests..."
     }
 }
+
 return this
