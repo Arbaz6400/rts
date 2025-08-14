@@ -1,10 +1,7 @@
-def executePipeline() {
-    stage('Build') {
-        echo "Deploying..."
-    }
-    stage('Test') {
-        echo "Running tests..."
+def runDeploy() {
+    stage('Deploy') {
+        echo "Deploying application..."
+        // your deploy steps here
     }
 }
-
 return this
