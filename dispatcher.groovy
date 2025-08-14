@@ -21,7 +21,7 @@ node {
             echo "Loading script from: ${scriptPath}"
             load(scriptPath)
         } else {
-            error "❌ Script '${scriptPath}' not found in RTS repo"
+            error "Script '${scriptPath}' not found in RTS repo"
         }
     }
 }
