@@ -2,9 +2,9 @@ def run() {
     pipeline {
         agent any
         stages {
-            stage('Build Stage') {
+            stage('Build') {
                 steps {
-                    echo "Running Build pipeline from RTS repo"
+                    echo "Running build from RTS repo"
                 }
             }
         }
