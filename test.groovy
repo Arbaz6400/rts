@@ -13,6 +13,18 @@ pipeline {
             }
         }
 
+        stage('Git Config Setup') {
+            steps {
+                script {
+                    sh """
+                        git config --global user.name "Arbaz6400"
+                        git config --global user.email "Shaikharbaz525@gmail.com"
+                    """
+                    echo "✅ Git username and email configured."
+                }
+            }
+        }
+
         stage('Test Stage') {
             steps {
                 echo "✅ Test Groovy from RTS repo executed successfully!"
