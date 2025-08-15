@@ -4,6 +4,7 @@ pipeline {
         stage('Check for Tag') {
             steps {
                 script {
+                    // Explicit UTF-8 reading mode
                     if (env.TAG_NAME && env.TAG_NAME.trim()) {
                         error "❌ This job cannot run on a tag build! Tag detected: ${env.TAG_NAME}"
                     } else {
@@ -13,23 +14,22 @@ pipeline {
             }
         }
 
-        stage('Git Config Setup') {
+        stage('Load Groovy from Git') {
             steps {
                 script {
-                    sh """
-                        git config --global user.name "Arbaz6400"
-                        git config --global user.email "Shaikharbaz525@gmail.com"
-                    """
-                    echo "✅ Git username and email configured."
-                }
-            }
-        }
+                    // Clone RTS repo or fetch updates
+                    sh 'rm -rf rts'
+                    sh 'git clone https://github.com/Arbaz6400/rts.git'
 
-        stage('Test Stage') {
-            steps {
-                echo "✅ Test Groovy from RTS repo executed successfully!"
-                echo "Running on node: ${env.NODE_NAME}"
-                echo "Workspace: ${env.WORKSPACE}"
+                    // Read Groovy file in UTF-8
+                    def groovyContent = readFile(
+                        file: 'rts/myScript.groovy',
+                        encoding: 'UTF-8'
+                    )
+
+                    // Run the script inside pipeline
+                    evaluate(groovyContent)
+                }
             }
         }
     }
