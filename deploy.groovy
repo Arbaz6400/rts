@@ -1,10 +1,19 @@
-def executePipeline() {
-    stage('Build') {
-        echo "deploy..."
+pipeline {
+    agent any
+    stages {
+        stage('Check for Tag') {
+            steps {
+                script {
+                    // Explicit UTF-8 reading mode
+                    
+                        echo "✅ No tag detected. deploy.groovy Proceeding..."
+                    }
+                }
+            }
     }
-    stage('Test') {
-        echo "Running tests..."
+    post {
+        always {
+            echo "✅ Finished test pipeline."
+        }
     }
 }
-
-return this
