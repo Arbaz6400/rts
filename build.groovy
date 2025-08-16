@@ -6,7 +6,7 @@ pipeline {
                 script {
                     // Explicit UTF-8 reading mode
                     
-                        echo "✅ No tag detected. Proceeding..."
+                        echo "✅ No tag detected. build.groovy Proceeding..."
                     }
                 }
             }
