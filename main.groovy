@@ -1,19 +1,27 @@
-def repoName = env.JOB_NAME.tokenize('/')[0]   // extract trigger repo name
+// Get repo that triggered this run
+def parts = env.JOB_NAME.tokenize('/')
+def repoName = parts[1]   // e.g. Leap1, Leap2, etc.
 
-def scriptPath = ""
-switch (repoName) {
-    case "Leap1":
-        scriptPath = "build.groovy"
-        break
-    case "Leap2":
-        scriptPath = "test.groovy"
-        break
-    case "Leap3":
-        scriptPath = "deploy.groovy"
-        break
-    default:
-        error("No pipeline defined for repo: ${repoName}")
+properties([
+    parameters([
+        choice(
+            name: 'PIPELINE_TYPE',
+            choices: ['build', 'test', 'deploy'],
+            description: "Which pipeline to run for ${repoName}?"
+        )
+    ])
+])
+
+node {
+    stage('Load Pipeline') {
+        echo "Triggered by repo: ${repoName}"
+        echo "Selected pipeline: ${params.PIPELINE_TYPE}"
+
+        def scriptPath = "${params.PIPELINE_TYPE}.groovy"
+        if (fileExists(scriptPath)) {
+            load(scriptPath)
+        } else {
+            error("Pipeline script ${scriptPath} not found in RTS repo")
+        }
+    }
 }
-
-echo "Loading ${scriptPath} for ${repoName}"
-load(scriptPath)
