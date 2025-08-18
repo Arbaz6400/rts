@@ -1,4 +1,5 @@
-pipeline {
+def call() {
+    pipeline {
     agent any
     stages {
         stage('Check for Tag') {
@@ -16,4 +17,5 @@ pipeline {
             echo "✅ Finished test pipeline."
         }
     }
+}
 }
