@@ -1,14 +1,10 @@
-@Library('my-shared-lib') _
-import utils.MyFunctions
-
-pipeline {
-    agent any
-    stages {
-        stage('Test Import') {
-            steps {
-                script {
-                    def msg = MyFunctions.customMessage("Arbaz")
-                    echo msg
+def call() {
+    pipeline {
+        agent any
+        stages {
+            stage('Demo Stage') {
+                steps {
+                    echo "Shared pipeline stage is running"
                 }
             }
         }
