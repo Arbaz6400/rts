@@ -12,10 +12,11 @@ def call() {
                 }
             }
     }
+    }
     post {
         always {
             echo "✅ Finished test pipeline."
         }
     }
 }
-}
+
