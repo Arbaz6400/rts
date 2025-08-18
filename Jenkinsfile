@@ -1,3 +1,4 @@
+echo ">>> DEBUG: Loaded Jenkinsfile version 2"
 properties([
     parameters([
         choice(name: 'PIPELINE_TYPE', choices: ['build', 'test', 'deploy'], description: 'Select which pipeline to run')
