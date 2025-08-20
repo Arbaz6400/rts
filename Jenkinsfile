@@ -2,9 +2,9 @@ pipeline {
     agent any
 
     environment {
-        SONAR_TOKEN   = credentials('sonar-token-id')      // Replace with your credential ID
-        SONARQUBE_URL = "http://localhost:9000"            // Your Sonar URL
-        PROJECT_KEY   = "your-project-key"                 // Replace with your project key
+        SONAR_TOKEN   = credentials('sonar-token-id')
+        SONARQUBE_URL = "http://localhost:9000"
+        PROJECT_KEY   = "your-project-key"
     }
 
     stages {
@@ -21,9 +21,10 @@ pipeline {
         stage('Quality Gate') {
             steps {
                 script {
-                    // instantiate and call class from src/
-                    def gate = new com.mycompany.QualityGate(this)
-                    gate.check(PROJECT_KEY, SONAR_TOKEN, SONARQUBE_URL)
+                    // LOAD the QualityGate class file
+                    def qualityGateScript = load "src/com/mycompany/QualityGate.groovy"
+                    // Call the check method from loaded script
+                    qualityGateScript.check(PROJECT_KEY, SONAR_TOKEN, SONARQUBE_URL)
                 }
             }
         }
