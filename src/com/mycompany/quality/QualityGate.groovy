@@ -1,12 +1,10 @@
-package com.mycompany
+package com.mycompany.quality
 
 import groovy.json.JsonSlurper
 
 class QualityGate implements Serializable {
     def steps
-    QualityGate(steps) {
-        this.steps = steps
-    }
+    QualityGate(steps) { this.steps = steps }
 
     void check(String projectKey, String sonarToken, String sonarUrl) {
         def response = steps.sh(
