@@ -17,14 +17,17 @@ pipeline {
                 """
             }
         }
-
         stage('Quality Gate') {
             steps {
                 script {
-                    // LOAD the QualityGate class file
-                    def qualityGateScript = load "src/com/mycompany/QualityGate.groovy"
-                    // Call the check method from loaded script
-                    qualityGateScript.check(PROJECT_KEY, SONAR_TOKEN, SONARQUBE_URL)
+                    // Read Groovy class file content
+                    def classText = readFile 'src/com/mycompany/QualityGate.groovy'
+                    // Load class via evaluate()
+                    def clazz = evaluate(classText)
+                    // Create instance of the class
+                    def gate = clazz.newInstance(this)
+                    // Call the check method
+                    gate.check(PROJECT_KEY, SONAR_TOKEN, SONARQUBE_URL)
                 }
             }
         }
