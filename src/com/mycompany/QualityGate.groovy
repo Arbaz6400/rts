@@ -3,11 +3,9 @@ package com.mycompany
 import groovy.json.JsonSlurper
 
 class QualityGate implements Serializable {
-
     def steps
-
     QualityGate(steps) {
-        this.steps = steps   // allows us to call sh, echo, error
+        this.steps = steps
     }
 
     void check(String projectKey, String sonarToken, String sonarUrl) {
