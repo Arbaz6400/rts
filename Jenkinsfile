@@ -1,25 +1,29 @@
-echo ">>> DEBUG: Loaded Jenkinsfile version 2"
 pipeline {
     agent any
 
-    parameters {
-        string(name: 'TARGET_REPO', defaultValue: 'Leap1', description: 'Which Leap repo triggered this build')
+    environment {
+        SONAR_TOKEN   = credentials('sonar-token-id')      // Replace with your credential ID
+        SONARQUBE_URL = "http://localhost:9000"            // Your Sonar URL
+        PROJECT_KEY   = "your-project-key"                 // Replace with your project key
     }
 
     stages {
-        stage('Debug') {
+        stage('SonarQube Scan') {
             steps {
-                echo "Triggered by repo: ${params.TARGET_REPO}"
+                sh """
+                    sonar-scanner -Dsonar.projectKey=${PROJECT_KEY} \
+                                   -Dsonar.host.url=${SONARQUBE_URL} \
+                                   -Dsonar.login=${SONAR_TOKEN}
+                """
             }
         }
 
-        stage('Load Pipeline') {
+        stage('Quality Gate') {
             steps {
-                // Load the right groovy file based on TARGET_REPO
                 script {
-                    def pipelineFile = "${params.TARGET_REPO.toLowerCase()}.groovy"
-                    echo "Loading pipeline: ${pipelineFile}"
-                    load pipelineFile
+                    // instantiate and call class from src/
+                    def gate = new com.mycompany.QualityGate(this)
+                    gate.check(PROJECT_KEY, SONAR_TOKEN, SONARQUBE_URL)
                 }
             }
         }
