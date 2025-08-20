@@ -1,3 +1,5 @@
+import com.mycompany.quality.QualityGate
+
 def call() {
     pipeline {
         agent any
@@ -20,7 +22,10 @@ def call() {
             }
             stage('Quality Gate') {
                 steps {
-                    QualityGate(PROJECT_KEY, SONAR_TOKEN, SONARQUBE_URL)
+                    script {
+                        def gate = new QualityGate(this)
+                        gate.check(PROJECT_KEY, SONAR_TOKEN, SONARQUBE_URL)
+                    }
                 }
             }
         }
