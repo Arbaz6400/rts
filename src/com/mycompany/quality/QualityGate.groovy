@@ -7,7 +7,7 @@ class QualityGate {
         this.script = script
     }
 
-    def check(String sonarToken, String repoName, String branchName) {
+    def check(String sonarToken, String repoName) {
         script.withCredentials([script.string(credentialsId: sonarToken, variable: 'SONAR_AUTH')]) {
             def status = script.sh(
                 script: """curl -s -u ${SONAR_AUTH}: \
@@ -17,9 +17,9 @@ class QualityGate {
             ).trim()
 
             if (status != 'OK') {
-                script.error("❌ Quality Gate failed for ${repoName}/${branchName} with status: ${status}")
+                script.error("❌ Quality Gate failed for project: ${repoName} (status: ${status})")
             } else {
-                script.echo "✅ Quality Gate passed for ${repoName}/${branchName}"
+                script.echo "✅ Quality Gate passed for project: ${repoName}"
             }
         }
     }
