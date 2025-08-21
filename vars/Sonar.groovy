@@ -7,7 +7,7 @@ def call(Map config = [:]) {
         environment {
             SONARQUBE_URL = config.sonarUrl ?: "http://localhost:9000"
             REPO_NAME     = config.repoName ?: env.JOB_NAME
-            BRANCH_NAME   = config.branchName ?: env.BRANCH_NAME
+            BRANCH_NAME   = config.branchName ?: "main"
         }
 
         stages {
@@ -31,7 +31,6 @@ def call(Map config = [:]) {
                     script {
                         withCredentials([string(credentialsId: config.credentialId ?: 'sonar-token-id', variable: 'SONAR_TOKEN')]) {
                             def gate = new QualityGate(this)
-                            // new signature: token, repoName, branchName
                             gate.check(SONAR_TOKEN, REPO_NAME, BRANCH_NAME)
                         }
                     }
