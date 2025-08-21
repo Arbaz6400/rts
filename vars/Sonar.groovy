@@ -1,6 +1,6 @@
 import com.mycompany.quality.QualityGate
 
-def call(String repoName, String branchName) {
+def call(String repoName) {
     pipeline {
         agent any
 
@@ -15,7 +15,6 @@ def call(String repoName, String branchName) {
                     sh """
                         sonar-scanner \
                           -Dsonar.projectKey=${repoName} \
-                          -Dsonar.branch.name=${branchName} \
                           -Dsonar.host.url=${SONARQUBE_URL} \
                           -Dsonar.login=${SONAR_TOKEN}
                     """
@@ -26,7 +25,8 @@ def call(String repoName, String branchName) {
                 steps {
                     script {
                         def gate = new QualityGate(this)
-                        gate.check(SONAR_TOKEN, repoName, branchName)
+                        // only repoName and token since branch is not supported
+                        gate.check(SONAR_TOKEN, repoName, "")
                     }
                 }
             }
