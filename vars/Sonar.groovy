@@ -1,26 +1,26 @@
+import com.mycompany.quality.QualityGate
+
 def call(Map config = [:]) {
     pipeline {
         agent any
 
-        stages {
-            stage('Setup Environment') {
-                steps {
-                    script {
-                        env.SONARQUBE_URL = config.sonarUrl ?: "http://localhost:9000"
-                        env.REPO_NAME     = config.repoName ?: env.JOB_NAME
-                        env.CRED_ID       = config.credentialId ?: "sonar-token-id"
-                    }
-                }
-            }
+        environment {
+            SONARQUBE_URL = config.sonarUrl ?: "http://localhost:9000"
+            REPO_NAME     = config.repoName ?: env.JOB_NAME
+            BRANCH_NAME   = config.branchName ?: env.BRANCH_NAME
+        }
 
+        stages {
             stage('SonarQube Scan') {
                 steps {
-                    withCredentials([string(credentialsId: env.CRED_ID, variable: 'SONAR_TOKEN')]) {
+                    withCredentials([string(credentialsId: config.credentialId ?: 'sonar-token-id', variable: 'SONAR_TOKEN')]) {
                         sh """
-                            ./gradlew sonarqube \
-                                -Dsonar.projectKey=${env.REPO_NAME} \
-                                -Dsonar.host.url=${env.SONARQUBE_URL} \
-                                -Dsonar.login=${SONAR_TOKEN}
+                            sonar-scanner \
+                              -Dsonar.projectKey=${REPO_NAME} \
+                              -Dsonar.projectName=${REPO_NAME} \
+                              -Dsonar.sources=. \
+                              -Dsonar.host.url=${SONARQUBE_URL} \
+                              -Dsonar.login=${SONAR_TOKEN}
                         """
                     }
                 }
@@ -29,18 +29,10 @@ def call(Map config = [:]) {
             stage('Quality Gate') {
                 steps {
                     script {
-                        def status = sh(
-                            script: """
-                                curl -s -u ${SONAR_TOKEN}: ${env.SONARQUBE_URL}/api/qualitygates/project_status?projectKey=${env.REPO_NAME} \
-                                | jq -r '.projectStatus.status'
-                            """,
-                            returnStdout: true
-                        ).trim()
-
-                        if (status != "OK") {
-                            error "❌ Quality Gate failed: ${status}"
-                        } else {
-                            echo "✅ Quality Gate passed!"
+                        withCredentials([string(credentialsId: config.credentialId ?: 'sonar-token-id', variable: 'SONAR_TOKEN')]) {
+                            def gate = new QualityGate(this)
+                            // new signature: token, repoName, branchName
+                            gate.check(SONAR_TOKEN, REPO_NAME, BRANCH_NAME)
                         }
                     }
                 }
