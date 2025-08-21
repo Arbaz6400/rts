@@ -1,36 +1,34 @@
 package com.mycompany.quality
 
-class QualityGate implements Serializable {
+import groovy.json.JsonSlurper
+
+class QualityGate {
     def script
 
     QualityGate(script) {
         this.script = script
     }
 
-    /**
-     * Check SonarQube Quality Gate
-     * @param sonarToken SonarQube Token
-     * @param repoName   Project Key / Repo Name
-     * @param branchName Branch Name
-     */
-    def check(String sonarToken, String repoName, String branchName) {
-        script.echo "🔍 Checking Quality Gate for project: ${repoName}, branch: ${branchName}"
+    def check(String token, String projectKey, String branchName = null) {
+        script.echo "🔎 Checking Quality Gate for project: ${projectKey}, branch: ${branchName}"
 
-        def status = script.sh(
-            script: """
-                curl -s -u ${sonarToken}: \\
-                "${script.env.SONARQUBE_URL}/api/qualitygates/project_status?projectKey=${repoName}" \\
-                | jq -r '.projectStatus.status'
-            """,
+        def url = "${script.env.SONARQUBE_URL}/api/qualitygates/project_status?projectKey=${projectKey}"
+        if (branchName) {
+            url += "&branch=${branchName}"
+        }
+
+        def response = script.sh(
+            script: """curl -s -u ${token}: "${url}" """,
             returnStdout: true
         ).trim()
 
-        script.echo "SonarQube Quality Gate Status: ${status}"
+        def json = new JsonSlurper().parseText(response)
+        def status = json.projectStatus.status
 
-        if (status != 'OK') {
-            script.error "❌ Quality Gate failed: ${status}"
-        } else {
-            script.echo "✅ Quality Gate passed"
+        script.echo "✅ Quality Gate Status: ${status}"
+
+        if (status != "OK") {
+            script.error("❌ Quality Gate failed with status: ${status}")
         }
     }
 }
