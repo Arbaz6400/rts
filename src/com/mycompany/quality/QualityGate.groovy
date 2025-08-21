@@ -1,26 +1,25 @@
 package com.mycompany.quality
 
-import groovy.json.JsonSlurper
-
 class QualityGate implements Serializable {
-    def steps
-    QualityGate(steps) { this.steps = steps }
+    def script
+    QualityGate(script) {
+        this.script = script
+    }
 
-    void check(String projectKey, String sonarToken, String sonarUrl) {
-        def response = steps.sh(
-            script: """
-                curl -s -u ${sonarToken}: "${sonarUrl}/api/qualitygates/project_status?projectKey=${projectKey}"
-            """,
-            returnStdout: true
-        ).trim()
+    def check(String token, String projectKey, String sonarUrl) {
+        script.withCredentials([script.string(credentialsId: token, variable: 'SONAR_AUTH')]) {
+            def status = script.sh(
+                script: """curl -s -u ${SONAR_AUTH}: \
+                    "${sonarUrl}/api/qualitygates/project_status?projectKey=${projectKey}" \
+                    | jq -r '.projectStatus.status'""",
+                returnStdout: true
+            ).trim()
 
-        def json = new JsonSlurper().parseText(response)
-        def status = json.projectStatus.status
-
-        steps.echo "SonarQube Quality Gate Status: ${status}"
-
-        if (status != "OK") {
-            steps.error("Quality Gate failed: ${status}")
+            if (status != 'OK') {
+                script.error("Quality Gate failed with status: ${status}")
+            } else {
+                script.echo "Quality Gate passed ✅"
+            }
         }
     }
 }
