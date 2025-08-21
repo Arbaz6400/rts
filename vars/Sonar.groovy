@@ -1,28 +1,32 @@
-def call(Map cfg = [:]) {
+import com.mycompany.quality.QualityGate
+
+def call() {
     pipeline {
         agent any
+
+        environment {
+            SONAR_TOKEN   = credentials('sonar-token-id')
+            SONARQUBE_URL = "http://localhost:9000"
+            PROJECT_KEY   = "your-project-key"
+        }
+
         stages {
-            stage('Sonar Scan') {
+            stage('SonarQube Scan') {
                 steps {
-                    script {
-                        def sonar = new com.mycompany.Sonar(this)
-                        sonar.scan(
-                            cfg.token   ?: error("Sonar token missing"),
-                            cfg.project ?: (env.JOB_NAME ?: "demo-project"),
-                            cfg.branch  ?: (env.BRANCH_NAME ?: "main")
-                        )
-                    }
+                    sh """
+                        sonar-scanner \
+                          -Dsonar.projectKey=${PROJECT_KEY} \
+                          -Dsonar.host.url=${SONARQUBE_URL} \
+                          -Dsonar.login=${SONAR_TOKEN}
+                    """
                 }
             }
+
             stage('Quality Gate') {
                 steps {
                     script {
-                        def qg = new com.mycompany.QualityGate(this)
-                        qg.check(
-                            cfg.token   ?: error("Sonar token missing"),
-                            cfg.project ?: (env.JOB_NAME ?: "demo-project"),
-                            cfg.branch  ?: (env.BRANCH_NAME ?: "main")
-                        )
+                        def gate = new QualityGate(this)
+                        gate.check(PROJECT_KEY, SONAR_TOKEN, SONARQUBE_URL)
                     }
                 }
             }
