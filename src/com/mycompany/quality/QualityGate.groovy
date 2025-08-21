@@ -1,26 +1,36 @@
 package com.mycompany.quality
 
-class QualityGate {
+class QualityGate implements Serializable {
     def script
 
     QualityGate(script) {
         this.script = script
     }
 
-    def check(String sonarToken, String repoName) {
-        script.withCredentials([script.string(credentialsId: sonarToken, variable: 'SONAR_AUTH')]) {
-            def status = script.sh(
-                script: """curl -s -u ${SONAR_AUTH}: \
-                    "${script.env.SONARQUBE_URL}/api/qualitygates/project_status?projectKey=${repoName}" \
-                    | jq -r '.projectStatus.status'""",
-                returnStdout: true
-            ).trim()
+    /**
+     * Check SonarQube Quality Gate
+     * @param sonarToken SonarQube Token
+     * @param repoName   Project Key / Repo Name
+     * @param branchName Branch Name
+     */
+    def check(String sonarToken, String repoName, String branchName) {
+        script.echo "🔍 Checking Quality Gate for project: ${repoName}, branch: ${branchName}"
 
-            if (status != 'OK') {
-                script.error("❌ Quality Gate failed for project: ${repoName} (status: ${status})")
-            } else {
-                script.echo "✅ Quality Gate passed for project: ${repoName}"
-            }
+        def status = script.sh(
+            script: """
+                curl -s -u ${sonarToken}: \\
+                "${script.env.SONARQUBE_URL}/api/qualitygates/project_status?projectKey=${repoName}" \\
+                | jq -r '.projectStatus.status'
+            """,
+            returnStdout: true
+        ).trim()
+
+        script.echo "SonarQube Quality Gate Status: ${status}"
+
+        if (status != 'OK') {
+            script.error "❌ Quality Gate failed: ${status}"
+        } else {
+            script.echo "✅ Quality Gate passed"
         }
     }
 }
