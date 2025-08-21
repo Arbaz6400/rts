@@ -4,7 +4,7 @@ def call(Map config = [:]) {
 
         environment {
             SONARQUBE_URL = config.sonarUrl ?: "http://localhost:9000"
-            PROJECT_KEY   = config.projectKey ?: "default-project"
+            REPO_NAME     = config.repoName ?: env.JOB_NAME
             SONAR_CRED_ID = config.credentialId ?: "sonar-token-id"
         }
 
@@ -14,7 +14,7 @@ def call(Map config = [:]) {
                     withCredentials([string(credentialsId: SONAR_CRED_ID, variable: 'SONAR_AUTH')]) {
                         sh """
                             sonar-scanner \
-                              -Dsonar.projectKey=${PROJECT_KEY} \
+                              -Dsonar.projectKey=${REPO_NAME} \
                               -Dsonar.host.url=${SONARQUBE_URL} \
                               -Dsonar.login=${SONAR_AUTH}
                         """
@@ -26,7 +26,7 @@ def call(Map config = [:]) {
                 steps {
                     script {
                         def gate = new com.mycompany.quality.QualityGate(this)
-                        gate.check(SONAR_CRED_ID, PROJECT_KEY, SONARQUBE_URL)
+                        gate.check(SONAR_CRED_ID, REPO_NAME)
                     }
                 }
             }
