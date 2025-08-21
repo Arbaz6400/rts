@@ -2,21 +2,25 @@ def call(Map config = [:]) {
     pipeline {
         agent any
 
-        environment {
-            SONARQUBE_URL = config.sonarUrl ?: "http://localhost:9000"
-            REPO_NAME     = config.repoName ?: env.JOB_NAME
-            SONAR_CRED_ID = config.credentialId ?: "sonar-token-id"
-        }
-
         stages {
+            stage('Setup Environment') {
+                steps {
+                    script {
+                        env.SONARQUBE_URL = config.sonarUrl ?: "http://localhost:9000"
+                        env.REPO_NAME     = config.repoName ?: env.JOB_NAME
+                        env.CRED_ID       = config.credentialId ?: "sonar-token-id"
+                    }
+                }
+            }
+
             stage('SonarQube Scan') {
                 steps {
-                    withCredentials([string(credentialsId: SONAR_CRED_ID, variable: 'SONAR_AUTH')]) {
+                    withCredentials([string(credentialsId: env.CRED_ID, variable: 'SONAR_TOKEN')]) {
                         sh """
-                            sonar-scanner \
-                              -Dsonar.projectKey=${REPO_NAME} \
-                              -Dsonar.host.url=${SONARQUBE_URL} \
-                              -Dsonar.login=${SONAR_AUTH}
+                            ./gradlew sonarqube \
+                                -Dsonar.projectKey=${env.REPO_NAME} \
+                                -Dsonar.host.url=${env.SONARQUBE_URL} \
+                                -Dsonar.login=${SONAR_TOKEN}
                         """
                     }
                 }
@@ -25,8 +29,19 @@ def call(Map config = [:]) {
             stage('Quality Gate') {
                 steps {
                     script {
-                        def gate = new com.mycompany.quality.QualityGate(this)
-                        gate.check(SONAR_CRED_ID, REPO_NAME)
+                        def status = sh(
+                            script: """
+                                curl -s -u ${SONAR_TOKEN}: ${env.SONARQUBE_URL}/api/qualitygates/project_status?projectKey=${env.REPO_NAME} \
+                                | jq -r '.projectStatus.status'
+                            """,
+                            returnStdout: true
+                        ).trim()
+
+                        if (status != "OK") {
+                            error "❌ Quality Gate failed: ${status}"
+                        } else {
+                            echo "✅ Quality Gate passed!"
+                        }
                     }
                 }
             }
