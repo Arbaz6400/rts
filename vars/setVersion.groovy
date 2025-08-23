@@ -1,31 +1,24 @@
-def call() {
-    def branch = env.BRANCH_NAME
-    def baseVersion = "1.0.0"
+def call(String baseVersion = "1.0.0") {
+    // Detect branch name from Jenkins or git
+    def branch = env.BRANCH_NAME ?: sh(
+        script: "git rev-parse --abbrev-ref HEAD",
+        returnStdout: true
+    ).trim()
 
-    if (branch.startsWith("release/")) {
-        baseVersion = branch.split("/")[1]
-    } else if (branch == "main") {
-        baseVersion = "1.0.0"
-    } else if (branch == "develop") {
-        baseVersion = "1.1.0"
-    }
+    echo "📦 Building from branch: ${branch}"
 
-    def finalVersion
-    if (branch == "develop") {
-        finalVersion = "${baseVersion}-SNAPSHOT"
-    } else if (branch.startsWith("release/")) {
-        finalVersion = "${baseVersion}-RC"
-    } else if (branch == "stg") {
-        finalVersion = baseVersion   // staging strips -RC
-    } else if (branch == "main") {
-        finalVersion = baseVersion
+    def version
+    if (branch == "release") {
+        version = baseVersion
     } else {
-        finalVersion = "${baseVersion}-SNAPSHOT"
+        version = "${baseVersion}-SNAPSHOT"
     }
 
-    echo "📦 Would set version in build.gradle: ${finalVersion}"
-    // simulate sed
+    // Update build.gradle
     sh """
-      sed -i 's/^version = .*/version = "${finalVersion}"/' build.gradle
+        sed -i 's/^version = .*/version = "${version}"/' build.gradle
     """
+
+    echo "✅ Using version: ${version}"
+    return version
 }
