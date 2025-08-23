@@ -3,6 +3,13 @@ def call() {
         agent any
 
         stages {
+            stage('Checkout') {
+                steps {
+                    // This ensures your actual project repo is checked out
+                    checkout scm
+                }
+            }
+
             stage('Set Version') {
                 steps {
                     script {
@@ -58,7 +65,6 @@ def call() {
             stage('Show Version') {
                 steps {
                     script {
-                        // Get version from build.gradle properly
                         def version = sh(
                             script: "grep '^version' build.gradle | cut -d '\"' -f2",
                             returnStdout: true
