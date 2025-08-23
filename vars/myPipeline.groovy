@@ -5,8 +5,9 @@ def call() {
         stages {
             stage('Checkout') {
                 steps {
-                    // This ensures your actual project repo is checked out
-                    checkout scm
+                    // Checkout your project repo (not the shared lib)
+                    git branch: env.BRANCH_NAME, 
+                        url: 'https://github.com/Arbaz6400/rts.git'
                 }
             }
 
