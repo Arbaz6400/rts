@@ -1,16 +1,38 @@
 def call() {
     pipeline {
         agent any
-        environment {
-            NEXUS_USER = credentials('nexus-username')
-            NEXUS_PASS = credentials('nexus-password')
-        }
 
         stages {
             stage('Set Version') {
                 steps {
                     script {
-                        setVersion()   // shared lib function
+                        def branch = env.BRANCH_NAME ?: "dev"
+                        def baseVersion = "1.0.0"
+
+                        if (branch.startsWith("release/")) {
+                            baseVersion = branch.split("/")[1]
+                        } else if (branch == "main") {
+                            baseVersion = "1.0.0"
+                        } else if (branch == "develop") {
+                            baseVersion = "1.1.0"
+                        }
+
+                        def finalVersion
+                        if (branch == "develop") {
+                            finalVersion = "${baseVersion}-SNAPSHOT"
+                        } else if (branch.startsWith("release/")) {
+                            finalVersion = "${baseVersion}-RC"
+                        } else if (branch == "main") {
+                            finalVersion = baseVersion
+                        } else {
+                            finalVersion = "${baseVersion}-SNAPSHOT"
+                        }
+
+                        echo "📦 Using version: ${finalVersion}"
+
+                        sh """
+                          sed -i 's/^version = .*/version = "${finalVersion}"/' build.gradle
+                        """
                     }
                 }
             }
@@ -18,31 +40,31 @@ def call() {
             stage('Build') {
                 steps {
                     script {
-                        echo "🛠️ Simulating: ./gradlew clean build"
+                        echo "🛠️ Simulating Gradle build..."
+                        sh "echo './gradlew clean build'"
                     }
                 }
             }
 
             stage('Publish') {
-                when {
-                    not { branch 'main' }  // skip publish on main
-                }
                 steps {
                     script {
-                        echo "👉 Simulating: ./gradlew publish"
-                        echo "   Nexus Username: ${NEXUS_USER}"
-                        echo "   Nexus Password: (hidden)"
-                        echo "   Artifact version: $(grep '^version' build.gradle | cut -d '\"' -f2)"
+                        echo "📤 Simulating publish to Nexus..."
+                        sh "echo './gradlew publish'"
                     }
                 }
             }
-        }
 
-        post {
-            success {
-                script {
-                    if (env.BRANCH_NAME == "main") {
-                        bumpMinorVersion()   // simulate minor bump in dev
+            stage('Show Version') {
+                steps {
+                    script {
+                        // Get version from build.gradle properly
+                        def version = sh(
+                            script: "grep '^version' build.gradle | cut -d '\"' -f2",
+                            returnStdout: true
+                        ).trim()
+
+                        echo "   ✅ Artifact version: ${version}"
                     }
                 }
             }
