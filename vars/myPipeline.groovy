@@ -5,7 +5,6 @@ def call() {
         stages {
             stage('Checkout') {
                 steps {
-                    // Checkout your project repo (not the shared lib)
                     git branch: env.BRANCH_NAME, 
                         url: 'https://github.com/Arbaz6400/rts.git'
                 }
@@ -25,7 +24,6 @@ def call() {
                             baseVersion = "1.1.0"
                         }
 
-                        def finalVersion
                         if (branch == "develop") {
                             finalVersion = "${baseVersion}-SNAPSHOT"
                         } else if (branch.startsWith("release/")) {
@@ -38,9 +36,8 @@ def call() {
 
                         echo "📦 Using version: ${finalVersion}"
 
-                        bat """
-                          echo sed -i "s/^version = .*/version = \\"${finalVersion}\\"/" build.gradle
-                        """
+                        // Just echo the sed command instead of running it
+                        bat "echo sed -i \"s/^version = .*/version = '${finalVersion}'/\" build.gradle"
                     }
                 }
             }
@@ -66,8 +63,7 @@ def call() {
             stage('Show Version') {
                 steps {
                     script {
-                        echo "✅ Simulating artifact version check..."
-                        bat 'echo grep ^version build.gradle | cut -d "\\""\\" -f2'
+                        echo "✅ Artifact version: ${finalVersion}"
                     }
                 }
             }
