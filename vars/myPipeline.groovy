@@ -5,8 +5,7 @@ def call() {
         stages {
             stage('Checkout') {
                 steps {
-                    // Checkout your project repo (not the shared lib)
-                    git branch: env.BRANCH_NAME, 
+                    git branch: env.BRANCH_NAME,
                         url: 'https://github.com/Arbaz6400/rts.git'
                 }
             }
@@ -38,8 +37,9 @@ def call() {
 
                         echo "📦 Using version: ${finalVersion}"
 
-                        sh """
-                          sed -i 's/^version = .*/version = "${finalVersion}"/' build.gradle
+                        // PowerShell to replace version in build.gradle
+                        bat """
+                        powershell -Command "(Get-Content build.gradle) -replace '^version = .*', 'version = \\"${finalVersion}\\"' | Set-Content build.gradle"
                         """
                     }
                 }
@@ -49,7 +49,7 @@ def call() {
                 steps {
                     script {
                         echo "🛠️ Simulating Gradle build..."
-                        sh "echo './gradlew clean build'"
+                        bat "gradlew.bat clean build"
                     }
                 }
             }
@@ -58,7 +58,7 @@ def call() {
                 steps {
                     script {
                         echo "📤 Simulating publish to Nexus..."
-                        sh "echo './gradlew publish'"
+                        bat "gradlew.bat publish"
                     }
                 }
             }
@@ -66,8 +66,8 @@ def call() {
             stage('Show Version') {
                 steps {
                     script {
-                        def version = sh(
-                            script: "grep '^version' build.gradle | cut -d '\"' -f2",
+                        def version = bat(
+                            script: 'powershell -Command "(Select-String \\"^version\\" build.gradle).Line.Split(\\"\\")[1]"',
                             returnStdout: true
                         ).trim()
 
