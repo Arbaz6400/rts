@@ -11,36 +11,33 @@ def call() {
             }
 
             stage('Set Version') {
-                steps {
-                    script {
-                        def branch = env.BRANCH_NAME ?: "dev"
-                        def baseVersion = "1.0.0"
+    steps {
+        script {
+            def branch = env.BRANCH_NAME ?: "dev"
+            echo "🌿 Detected branch: ${branch}"
 
-                        if (branch.startsWith("release/")) {
-                            baseVersion = branch.split("/")[1]
-                        } else if (branch == "main") {
-                            baseVersion = "1.0.0"
-                        } else if (branch == "develop") {
-                            baseVersion = "1.1.0"
-                        }
+            def baseVersion = "1.0.0"
 
-                        if (branch == "develop") {
-                            finalVersion = "${baseVersion}-SNAPSHOT"
-                        } else if (branch.startsWith("release/")) {
-                            finalVersion = "${baseVersion}-RC"
-                        } else if (branch == "main") {
-                            finalVersion = baseVersion
-                        } else {
-                            finalVersion = "${baseVersion}-SNAPSHOT"
-                        }
-
-                        echo "📦 Using version: ${finalVersion}"
-
-                        // Just echo the sed command instead of running it
-                        bat "echo sed -i \"s/^version = .*/version = '${finalVersion}'/\" build.gradle"
-                    }
-                }
+            if (branch.startsWith("release/")) {
+                baseVersion = branch.split("/")[1]   // take part after release/
+                finalVersion = "${baseVersion}-RC"
+            } else if (branch == "main") {
+                baseVersion = "1.0.0"
+                finalVersion = baseVersion
+            } else if (branch == "develop") {
+                baseVersion = "1.1.0"
+                finalVersion = "${baseVersion}-SNAPSHOT"
+            } else {
+                finalVersion = "${baseVersion}-SNAPSHOT"
             }
+
+            echo "📦 Using version: ${finalVersion}"
+
+            bat "echo sed -i \"s/^version = .*/version = '${finalVersion}'/\" build.gradle"
+        }
+    }
+}
+
 
             stage('Build') {
                 steps {
