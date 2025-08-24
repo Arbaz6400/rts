@@ -3,8 +3,8 @@ def call() {
         agent any
 
         environment {
-            NEXUS_USER = credentials('nexus-username')
-            NEXUS_PASS = credentials('nexus-password')
+          //  NEXUS_USER = credentials('nexus-username')
+           // NEXUS_PASS = credentials('nexus-password')
         }
 
         stages {
