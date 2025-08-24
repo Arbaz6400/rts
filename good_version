@@ -6,54 +6,30 @@ def call() {
             stage('Versioning') {
                 steps {
                     script {
-                        def branch = env.BRANCH_NAME
-                        def buildNum = env.BUILD_NUMBER
-                        def baseVersion = readBaseVersion()
+                        // Read build.gradle from Streaming repo
+                        def gradleFile = readFile("${env.WORKSPACE}/build.gradle")
 
-                        def version = computeVersion(branch, buildNum, baseVersion)
-                        echo "📌 Using version: ${version}"
-                        env.PROJECT_VERSION = version
+                        // Match version = '1.0.0' or version = "1.0.0"
+                        def matcher = gradleFile =~ /version\s*=\s*['"](.*)['"]/
+                        def baseVersion = matcher ? matcher[0][1] : "0.0.1"
+
+                        echo "📖 Base version from build.gradle: ${baseVersion}"
+
+                        // Branch-based suffix logic
+                        def newVersion = baseVersion
+                        if (env.BRANCH_NAME == "develop") {
+                            newVersion = "${baseVersion}-SNAPSHOT"
+                        } else if (env.BRANCH_NAME == "release") {
+                            newVersion = "${baseVersion}-RC"
+                        } else if (env.BRANCH_NAME == "main" || env.BRANCH_NAME == "stg") {
+                            // main/stg → no suffix, use base version
+                            newVersion = baseVersion
+                        }
+
+                        echo "📌 Using version: ${newVersion}"
                     }
                 }
             }
-
-            stage('Build') {
-                steps {
-                    echo "🛠️ Simulating Gradle build..."
-                    // later: gradleCmd("clean build")
-                }
-            }
-
-            stage('Publish') {
-                when { expression { env.BRANCH_NAME == 'release' || env.BRANCH_NAME == 'main' } }
-                steps {
-                    echo "🚀 Would publish ${env.PROJECT_VERSION} to Nexus"
-                    // nexusPush(env.PROJECT_VERSION)
-                }
-            }
-
-            stage('Show Version') {
-                steps {
-                    echo "✅ Final version: ${env.PROJECT_VERSION}"
-                }
-            }
         }
-    }
-}
-
-def readBaseVersion() {
-    def matcher = readFile('build.gradle') =~ /version\s*=\s*"(.*)"/
-    return matcher ? matcher[0][1] : "0.0.1"
-}
-
-def computeVersion(branch, buildNum, baseVersion) {
-    if (branch == 'develop') {
-        return "${baseVersion}-SNAPSHOT"
-    } else if (branch == 'release') {
-        return "${baseVersion}-RC"
-    } else if (branch == 'main' || branch == 'stg') {
-        return baseVersion
-    } else {
-        return "${baseVersion}-${branch}-${buildNum}"
     }
 }
