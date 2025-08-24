@@ -5,45 +5,44 @@ def call() {
         stages {
             stage('Checkout') {
                 steps {
-                    git branch: env.BRANCH_NAME, 
+                    git branch: env.BRANCH_NAME,
                         url: 'https://github.com/Arbaz6400/rts.git'
                 }
             }
 
             stage('Set Version') {
-    steps {
-        script {
-            def branch = env.BRANCH_NAME ?: "dev"
-            echo "🌿 Detected branch: ${branch}"
+                steps {
+                    script {
+                        echo "🌿 Detected branch: ${env.BRANCH_NAME}"
 
-            def baseVersion = "1.0.0"
+                        // Read current version from build.gradle
+                        def gradleFile = readFile('build.gradle')
+                        def currentVersion = (gradleFile =~ /version\s*=\s*['"]([^'"]+)['"]/)[0][1]
 
-            if (branch.startsWith("release/")) {
-                baseVersion = branch.split("/")[1]   // take part after release/
-                finalVersion = "${baseVersion}-RC"
-            } else if (branch == "main") {
-                baseVersion = "1.0.0"
-                finalVersion = baseVersion
-            } else if (branch == "develop") {
-                baseVersion = "1.1.0"
-                finalVersion = "${baseVersion}-SNAPSHOT"
-            } else {
-                finalVersion = "${baseVersion}-SNAPSHOT"
+                        // Logic for version suffix
+                        if (env.BRANCH_NAME == "main") {
+                            finalVersion = currentVersion.replace("-SNAPSHOT", "").replace("-RC", "")
+                        } else if (env.BRANCH_NAME == "release") {
+                            finalVersion = currentVersion.replace("-SNAPSHOT", "") + "-RC"
+                        } else {
+                            finalVersion = currentVersion.replace("-RC", "") + "-SNAPSHOT"
+                        }
+
+                        echo "📦 Using version: ${finalVersion}"
+
+                        // Simulate modifying build.gradle (just echo, no actual sed)
+                        bat """
+                            echo sed -i "s/^version = .*/version = '${finalVersion}'/" build.gradle
+                        """
+                    }
+                }
             }
-
-            echo "📦 Using version: ${finalVersion}"
-
-            bat "echo sed -i \"s/^version = .*/version = '${finalVersion}'/\" build.gradle"
-        }
-    }
-}
-
 
             stage('Build') {
                 steps {
                     script {
                         echo "🛠️ Simulating Gradle build..."
-                        bat 'echo gradlew.bat clean build'
+                        bat 'echo gradlew clean build'
                     }
                 }
             }
@@ -52,7 +51,7 @@ def call() {
                 steps {
                     script {
                         echo "📤 Simulating publish to Nexus..."
-                        bat 'echo gradlew.bat publish'
+                        bat 'echo gradlew publish'
                     }
                 }
             }
