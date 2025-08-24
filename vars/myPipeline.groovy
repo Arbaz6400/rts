@@ -2,10 +2,10 @@ def call() {
     pipeline {
         agent any
 
-        environment {
+      //  environment {
           //  NEXUS_USER = credentials('nexus-username')
            // NEXUS_PASS = credentials('nexus-password')
-        }
+   //     }
 
         stages {
             stage('Versioning') {
