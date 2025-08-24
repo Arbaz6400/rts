@@ -1,41 +1,57 @@
 def call() {
     pipeline {
-    agent any
+        agent any
 
-    stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
+        environment {
+            NEXUS_USER = credentials('nexus-username')
+            NEXUS_PASS = credentials('nexus-password')
         }
 
-        stage('Versioning') {
-            steps {
-                script {
-                    def gradleVersion = sh(
-                        script: "grep '^version' build.gradle | awk '{print \$3}' | tr -d \"'\"",
-                        returnStdout: true
-                    ).trim()
+        stages {
+            stage('Versioning') {
+                steps {
+                    script {
+                        // Read build.gradle from Streaming repo
+                        def gradleFile = readFile("${env.WORKSPACE}/build.gradle")
 
-                    def baseVersion = gradleVersion ?: "0.0.1"
-                    def branchName = env.BRANCH_NAME ?: 'develop'
+                        // Match version = '1.0.0' or version = "1.0.0"
+                        def matcher = gradleFile =~ /version\s*=\s*['"](.*)['"]/
+                        def baseVersion = matcher ? matcher[0][1] : "0.0.1"
 
-                    if (branchName == "main") {
+                        echo "📖 Base version from build.gradle: ${baseVersion}"
+
+                        // Branch-based suffix logic
                         newVersion = baseVersion
-                    } else if (branchName == "release") {
-                        newVersion = baseVersion + "-RC"
-                    } else if (branchName == "develop") {
-                        newVersion = baseVersion + "-SNAPSHOT"
-                    } else {
-                        newVersion = baseVersion + "-${branchName}"
-                    }
+                        if (env.BRANCH_NAME == "develop") {
+                            newVersion = "${baseVersion}-SNAPSHOT"
+                        } else if (env.BRANCH_NAME == "release") {
+                            newVersion = "${baseVersion}-RC"
+                        } else if (env.BRANCH_NAME == "main" || env.BRANCH_NAME == "stg") {
+                            // main/stg → no suffix, use base version
+                            newVersion = baseVersion
+                        }
 
-                    echo "📌 Using version: ${newVersion}"
+                        echo "📌 Using version: ${newVersion}"
+                    }
+                }
+            }
+
+            stage('Build') {
+                steps {
+                    script {
+                        echo "🛠️ Building with version ${newVersion}"
+                       // sh "./gradlew clean build -Pversion=${newVersion}"
+                    }
+                }
+            }
+
+            stage('Publish') {
+                steps {
+                    script {
+                        echo "🚀 Publishing ${newVersion} to Nexus..." 
+                    }
                 }
             }
         }
-
-        
     }
-}
 }
