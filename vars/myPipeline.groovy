@@ -34,18 +34,6 @@ pipeline {
             }
         }
 
-        stage('Publish') {
-            steps {
-                script {
-                    echo "🚀 Publishing ${newVersion} to Nexus..."
-                   // sh """
-                     //   ./gradlew clean publish \
-                       // -PnexusUsername=${env.NEXUS_USER} \
-                       // -PnexusPassword=${env.NEXUS_PASS} \
-                       // -Pversion=${newVersion}
-                   // """
-                }
-            }
-        }
+        
     }
 }
