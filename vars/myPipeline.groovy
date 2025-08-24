@@ -6,42 +6,30 @@ def call() {
             stage('Versioning') {
                 steps {
                     script {
-                        // Read version from Streaming repo build.gradle
+                        // Read build.gradle from Streaming repo
                         def gradleFile = readFile("${env.WORKSPACE}/build.gradle")
-                        def matcher = gradleFile =~ /version\s*=\s*"(.*)"/
+
+                        // Match version = '1.0.0' or version = "1.0.0"
+                        def matcher = gradleFile =~ /version\s*=\s*['"](.*)['"]/
                         def baseVersion = matcher ? matcher[0][1] : "0.0.1"
 
                         echo "📖 Base version from build.gradle: ${baseVersion}"
 
-                        // Append suffix depending on branch
-                        def branch = env.BRANCH_NAME
-                        def finalVersion = baseVersion
-
-                        if (branch == "develop") {
-                            finalVersion = "${baseVersion}-SNAPSHOT"
-                        } else if (branch == "release") {
-                            finalVersion = "${baseVersion}-RC"
-                        } else if (branch in ["main", "stg"]) {
-                            // No suffix
-                            finalVersion = baseVersion
-                        } else {
-                            echo "⚠️ Unknown branch '${branch}', keeping base version"
+                        // Branch-based suffix logic
+                        def newVersion = baseVersion
+                        if (env.BRANCH_NAME == "develop") {
+                            newVersion = "${baseVersion}-SNAPSHOT"
+                        } else if (env.BRANCH_NAME == "release") {
+                            newVersion = "${baseVersion}-RC"
+                        } else if (env.BRANCH_NAME == "main" || env.BRANCH_NAME == "stg") {
+                            // main/stg → no suffix, use base version
+                            newVersion = baseVersion
                         }
 
-                        echo "📌 Using version: ${finalVersion}"
-
-                        // Export for later stages (like Nexus publish)
-                        env.PROJECT_VERSION = finalVersion
+                        echo "📌 Using version: ${newVersion}"
                     }
                 }
             }
-
-            // Example build stage (disabled for now)
-            // stage('Build') {
-            //     steps {
-            //         sh "./gradlew build -Pversion=${env.PROJECT_VERSION}"
-            //     }
-            // }
         }
     }
 }
