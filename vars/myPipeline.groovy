@@ -5,6 +5,8 @@ def call() {
         environment {
             // Nexus credentials from Jenkins (username/password)
             NEXUS = credentials('nexus-creds')
+            // Ensure Gradle is on PATH (Chocolatey installation path)
+            PATH = "C:\\ProgramData\\chocolatey\\bin;${env.PATH}"
         }
 
         stages {
@@ -41,11 +43,10 @@ def call() {
                     script {
                         echo "⚡ Running Gradle build and publish"
 
-                        // Use Gradle wrapper instead of Jenkins tool
                         if (isUnix()) {
                             sh "./gradlew clean build publish -PnexusUsername=${env.NEXUS_USR} -PnexusPassword=${env.NEXUS_PSW} -Pversion=${env.APP_VERSION}"
                         } else {
-                            bat "gradlew.bat clean build publish -PnexusUsername=%NEXUS_USR% -PnexusPassword=%NEXUS_PSW% -Pversion=%APP_VERSION%"
+                            bat "gradle clean build publish -PnexusUsername=%NEXUS_USR% -PnexusPassword=%NEXUS_PSW% -Pversion=%APP_VERSION%"
                         }
                     }
                 }
