@@ -3,67 +3,97 @@ def call() {
         agent any
 
         environment {
-            // Make sure these are defined in Jenkins credentials or environment
-            NEXUS_USERNAME = credentials('nexus-username-id')
-            NEXUS_PASSWORD = credentials('nexus-password-id')
+            // Gradle tool name configured in Jenkins (optional if wrapper exists)
+            GRADLE_TOOL = "Gradle-8.3"
         }
 
         stages {
+
+            stage('Checkout SCM') {
+                steps {
+                    checkout scm
+                }
+            }
+
             stage('Versioning') {
                 steps {
                     script {
-                        // Read build.gradle from Streaming repo
-                        def gradleFile = readFile("${env.WORKSPACE}/build.gradle")
+                        def gradleFilePath = "${env.WORKSPACE}/build.gradle"
+                        if (!fileExists(gradleFilePath)) {
+                            error "❌ build.gradle not found in workspace!"
+                        }
 
-                        // Match version = '1.0.0' or version = "1.0.0"
+                        def gradleFile = readFile(gradleFilePath)
                         def matcher = gradleFile =~ /version\s*=\s*['"](.*)['"]/
                         def baseVersion = matcher ? matcher[0][1] : "0.0.1"
 
                         echo "📖 Base version from build.gradle: ${baseVersion}"
 
                         // Branch-based suffix logic
-                        def newVersion = baseVersion
                         if (env.BRANCH_NAME == "develop") {
-                            newVersion = "${baseVersion}-SNAPSHOT"
+                            env.NEW_VERSION = "${baseVersion}-SNAPSHOT"
                         } else if (env.BRANCH_NAME == "release") {
-                            newVersion = "${baseVersion}-RC"
-                        } else if (env.BRANCH_NAME == "main" || env.BRANCH_NAME == "stg") {
-                            // main/stg → no suffix, use base version
-                            newVersion = baseVersion
+                            env.NEW_VERSION = "${baseVersion}-RC"
+                        } else {
+                            env.NEW_VERSION = baseVersion
                         }
 
-                        env.PROJECT_VERSION = newVersion
-                        echo "📌 Using project version: ${env.PROJECT_VERSION}"
+                        echo "📌 Using version: ${env.NEW_VERSION}"
+                    }
+                }
+            }
+
+            stage('Check Credentials') {
+                steps {
+                    withCredentials([usernamePassword(
+                        credentialsId: 'nexus-creds', 
+                        usernameVariable: 'NEXUS_USERNAME', 
+                        passwordVariable: 'NEXUS_PASSWORD'
+                    )]) {
+                        script {
+                            if (!env.NEXUS_USERNAME || !env.NEXUS_PASSWORD) {
+                                error "❌ Nexus credentials not loaded!"
+                            } else {
+                                echo "✅ Nexus credentials loaded"
+                            }
+                        }
                     }
                 }
             }
 
             stage('Build') {
                 steps {
-                    script {
-                        echo "⚡ Building project with version ${env.PROJECT_VERSION}"
-                        // Use Gradle wrapper if available, else Jenkins Gradle tool
-                        def gradleCmd = fileExists('gradlew.bat') ? 'gradlew.bat' : "${tool 'Gradle-8.3'}/bin/gradle.bat"
-                        bat "${gradleCmd} clean build -Pversion=${env.PROJECT_VERSION} -PNEXUS_USERNAME=${env.NEXUS_USERNAME} -PNEXUS_PASSWORD=${env.NEXUS_PASSWORD}"
+                    withCredentials([usernamePassword(
+                        credentialsId: 'nexus-creds', 
+                        usernameVariable: 'NEXUS_USERNAME', 
+                        passwordVariable: 'NEXUS_PASSWORD'
+                    )]) {
+                        script {
+                            // Use Gradle wrapper if present, otherwise Jenkins tool
+                            def gradleCmd = fileExists("${env.WORKSPACE}/gradlew.bat") ? 
+                                "${env.WORKSPACE}/gradlew.bat" : 
+                                "${tool(env.GRADLE_TOOL)}/bin/gradle.bat"
+
+                            bat "\"${gradleCmd}\" clean build -Pversion=${env.NEW_VERSION} -PNEXUS_USERNAME=%NEXUS_USERNAME% -PNEXUS_PASSWORD=%NEXUS_PASSWORD%"
+                        }
                     }
                 }
             }
 
             stage('Publish') {
                 steps {
-                    script {
-                        echo "🚀 Publishing project version ${env.PROJECT_VERSION}"
+                    withCredentials([usernamePassword(
+                        credentialsId: 'nexus-creds', 
+                        usernameVariable: 'NEXUS_USERNAME', 
+                        passwordVariable: 'NEXUS_PASSWORD'
+                    )]) {
+                        script {
+                            def gradleCmd = fileExists("${env.WORKSPACE}/gradlew.bat") ? 
+                                "${env.WORKSPACE}/gradlew.bat" : 
+                                "${tool(env.GRADLE_TOOL)}/bin/gradle.bat"
 
-                        // Determine repository URL based on version
-                        def repoUrl = env.PROJECT_VERSION.endsWith("SNAPSHOT") ?
-                                      "https://nexus.yourcompany.com/repository/maven-snapshots/" :
-                                      "https://nexus.yourcompany.com/repository/maven-releases/"
-
-                        def gradleCmd = fileExists('gradlew.bat') ? 'gradlew.bat' : "${tool 'Gradle-8.3'}/bin/gradle.bat"
-
-                        bat "${gradleCmd} publish -Pversion=${env.PROJECT_VERSION} " +
-                            "-PNEXUS_USERNAME=${env.NEXUS_USERNAME} -PNEXUS_PASSWORD=${env.NEXUS_PASSWORD} " +
-                            "-PrepositoryUrl=${repoUrl}"
+                            bat "\"${gradleCmd}\" publish -Pversion=${env.NEW_VERSION} -PNEXUS_USERNAME=%NEXUS_USERNAME% -PNEXUS_PASSWORD=%NEXUS_PASSWORD%"
+                        }
                     }
                 }
             }
@@ -71,7 +101,7 @@ def call() {
 
         post {
             success {
-                echo "✅ Build and publish successful: ${env.PROJECT_VERSION}"
+                echo "✅ Build and publish succeeded!"
             }
             failure {
                 echo "❌ Build or publish failed!"
