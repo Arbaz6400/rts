@@ -1,9 +1,9 @@
-def call(Map config = [:]) {
+def call() {
     pipeline {
         agent any
 
         environment {
-            GRADLE_USER_HOME = "${env.WORKSPACE}/.gradle"
+            GRADLE_USER_HOME = "${WORKSPACE}/.gradle"
         }
 
         stages {
@@ -13,20 +13,30 @@ def call(Map config = [:]) {
                 }
             }
 
-            stage('Set Version') {
+            stage('Versioning') {
                 steps {
                     script {
-                        def baseVersion = "1.0.0"  // fallback, can also be from gradle.properties
-                        if (env.BRANCH_NAME == "main") {
-                            env.PROJECT_VERSION = baseVersion
-                        } else if (env.BRANCH_NAME == "develop") {
-                            env.PROJECT_VERSION = "${baseVersion}-SNAPSHOT"
-                        } else {
-                            // feature/my-feature → 1.0.0-my-feature
-                            def safeBranch = env.BRANCH_NAME.replaceAll('[^a-zA-Z0-9.-]', '-')
-                            env.PROJECT_VERSION = "${baseVersion}-${safeBranch}"
+                        // Read build.gradle from repo
+                        def gradleFile = readFile("${env.WORKSPACE}/build.gradle")
+
+                        // Match: version = '1.0.0' or version = "1.0.0"
+                        def matcher = gradleFile =~ /version\s*=\s*['"](.*)['"]/
+                        def baseVersion = matcher ? matcher[0][1] : "0.0.1"
+
+                        echo "📖 Base version from build.gradle: ${baseVersion}"
+
+                        // Branch-based suffix logic
+                        def newVersion = baseVersion
+                        if (env.BRANCH_NAME == "develop") {
+                            newVersion = "${baseVersion}-SNAPSHOT"
+                        } else if (env.BRANCH_NAME == "release") {
+                            newVersion = "${baseVersion}-RC"
+                        } else if (env.BRANCH_NAME in ["main", "stg"]) {
+                            newVersion = baseVersion
                         }
-                        echo "📦 Using version: ${env.PROJECT_VERSION}"
+
+                        env.PROJECT_VERSION = newVersion
+                        echo "📌 Using version: ${env.PROJECT_VERSION}"
                     }
                 }
             }
@@ -37,7 +47,7 @@ def call(Map config = [:]) {
                                                       usernameVariable: 'NEXUS_USERNAME',
                                                       passwordVariable: 'NEXUS_PASSWORD')]) {
                         sh """
-                            gradle7 -g ${env.GRADLE_USER_HOME} --stacktrace --no-daemon clean build \
+                            ./gradlew clean build \
                               -Pversion=${env.PROJECT_VERSION} \
                               -PNEXUS_USERNAME=$NEXUS_USERNAME \
                               -PNEXUS_PASSWORD=$NEXUS_PASSWORD
@@ -47,12 +57,15 @@ def call(Map config = [:]) {
             }
 
             stage('Publish') {
+                when {
+                    expression { env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'release' || env.BRANCH_NAME == 'stg' }
+                }
                 steps {
                     withCredentials([usernamePassword(credentialsId: 'nexus-creds',
                                                       usernameVariable: 'NEXUS_USERNAME',
                                                       passwordVariable: 'NEXUS_PASSWORD')]) {
                         sh """
-                            gradle7 -g ${env.GRADLE_USER_HOME} --stacktrace --no-daemon publish \
+                            ./gradlew publish \
                               -Pversion=${env.PROJECT_VERSION} \
                               -PNEXUS_USERNAME=$NEXUS_USERNAME \
                               -PNEXUS_PASSWORD=$NEXUS_PASSWORD
@@ -64,7 +77,7 @@ def call(Map config = [:]) {
 
         post {
             success {
-                echo "✅ Build and publish completed successfully. Version: ${env.PROJECT_VERSION}"
+                echo "✅ Build and publish succeeded for version ${env.PROJECT_VERSION}"
             }
             failure {
                 echo "❌ Build or publish failed."
