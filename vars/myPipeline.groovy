@@ -16,8 +16,13 @@ def call() {
             stage('Versioning') {
                 steps {
                     script {
-                        // Read build.gradle version
-                        def gradleFile = readFile("${env.WORKSPACE}/build.gradle")
+                        // Adjust this path if build.gradle is inside a subfolder
+                        def gradleFilePath = "${env.WORKSPACE}/build.gradle"
+                        if (!fileExists(gradleFilePath)) {
+                            error "build.gradle not found at ${gradleFilePath}"
+                        }
+
+                        def gradleFile = readFile(gradleFilePath)
                         def matcher = gradleFile =~ /version\s*=\s*['"](.*)['"]/
                         def baseVersion = matcher ? matcher[0][1] : "0.0.1"
 
@@ -44,22 +49,28 @@ def call() {
                                                       usernameVariable: 'NEXUS_USERNAME',
                                                       passwordVariable: 'NEXUS_PASSWORD')]) {
                         script {
+                            def gradlewPath = isUnix() ? "./gradlew" : "gradlew.bat"
+
+                            if (!fileExists("${env.WORKSPACE}/${gradlewPath}")) {
+                                error "${gradlewPath} not found in workspace. Please commit Gradle wrapper."
+                            }
+
                             if (isUnix()) {
-                                // Linux/macOS agents
                                 sh """
-                                    ./gradlew clean build \\
-                                      -Pversion=${env.PROJECT_VERSION} \\
-                                      -PNEXUS_USERNAME=${env.NEXUS_USERNAME} \\
-                                      -PNEXUS_PASSWORD=${env.NEXUS_PASSWORD}
+                                    ${gradlewPath} clean build \\
+                                        -Pversion=${env.PROJECT_VERSION} \\
+                                        -PNEXUS_USERNAME=${env.NEXUS_USERNAME} \\
+                                        -PNEXUS_PASSWORD=${env.NEXUS_PASSWORD}
                                 """
                             } else {
-                                // Windows agents
-                                bat """
-                                    gradlew.bat clean build ^
-                                      -Pversion=${env.PROJECT_VERSION} ^
-                                      -PNEXUS_USERNAME=${env.NEXUS_USERNAME} ^
-                                      -PNEXUS_PASSWORD=${env.NEXUS_PASSWORD}
-                                """
+                                bat(script: """
+                                    ${gradlewPath} clean build ^
+                                        -Pversion=${env.PROJECT_VERSION}
+                                """,
+                                env: [
+                                    "NEXUS_USERNAME=${env.NEXUS_USERNAME}",
+                                    "NEXUS_PASSWORD=${env.NEXUS_PASSWORD}"
+                                ])
                             }
                         }
                     }
@@ -72,20 +83,24 @@ def call() {
                                                       usernameVariable: 'NEXUS_USERNAME',
                                                       passwordVariable: 'NEXUS_PASSWORD')]) {
                         script {
+                            def gradlewPath = isUnix() ? "./gradlew" : "gradlew.bat"
+
                             if (isUnix()) {
                                 sh """
-                                    ./gradlew publish \\
-                                      -Pversion=${env.PROJECT_VERSION} \\
-                                      -PNEXUS_USERNAME=${env.NEXUS_USERNAME} \\
-                                      -PNEXUS_PASSWORD=${env.NEXUS_PASSWORD}
+                                    ${gradlewPath} publish \\
+                                        -Pversion=${env.PROJECT_VERSION} \\
+                                        -PNEXUS_USERNAME=${env.NEXUS_USERNAME} \\
+                                        -PNEXUS_PASSWORD=${env.NEXUS_PASSWORD}
                                 """
                             } else {
-                                bat """
-                                    gradlew.bat publish ^
-                                      -Pversion=${env.PROJECT_VERSION} ^
-                                      -PNEXUS_USERNAME=${env.NEXUS_USERNAME} ^
-                                      -PNEXUS_PASSWORD=${env.NEXUS_PASSWORD}
-                                """
+                                bat(script: """
+                                    ${gradlewPath} publish ^
+                                        -Pversion=${env.PROJECT_VERSION}
+                                """,
+                                env: [
+                                    "NEXUS_USERNAME=${env.NEXUS_USERNAME}",
+                                    "NEXUS_PASSWORD=${env.NEXUS_PASSWORD}"
+                                ])
                             }
                         }
                     }
