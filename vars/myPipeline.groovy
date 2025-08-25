@@ -3,8 +3,7 @@ def call() {
         agent any
 
         environment {
-            // keep your nexus credentials configured in Jenkins
-            NEXUS_CREDS = credentials('nexus-creds')
+            PROJECT_VERSION = ''
         }
 
         stages {
@@ -19,26 +18,19 @@ def call() {
                     script {
                         def gradleFile = readFile("${env.WORKSPACE}/build.gradle")
                         def matcher = gradleFile =~ /version\s*=\s*['"](.*)['"]/
-                        def baseVersion = matcher ? matcher[0][1] : "0.0.1"
+                        def baseVersion = matcher ? matcher[0][1] : "1.0.0"
+
                         echo "📖 Base version from build.gradle: ${baseVersion}"
 
-                        // Branch-based version suffix
-                        if (env.BRANCH_NAME == "develop") {
-                            env.APP_VERSION = "${baseVersion}-SNAPSHOT"
-                        } else if (env.BRANCH_NAME == "release") {
-                            env.APP_VERSION = "${baseVersion}-RC"
-                        } else if (env.BRANCH_NAME == "main" || env.BRANCH_NAME == "stg") {
-                            env.APP_VERSION = baseVersion
-                        }
-
-                        echo "📌 Using version: ${env.APP_VERSION}"
+                        env.PROJECT_VERSION = env.BRANCH_NAME == 'develop' ? "${baseVersion}-SNAPSHOT" : baseVersion
+                        echo "📌 Using version: ${env.PROJECT_VERSION}"
                     }
                 }
             }
 
             stage('Check Nexus Credentials') {
                 steps {
-                    script {
+                    withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_CREDS_USR', passwordVariable: 'NEXUS_CREDS_PSW')]) {
                         echo "✅ Nexus credentials loaded"
                     }
                 }
@@ -46,26 +38,24 @@ def call() {
 
             stage('Build') {
                 steps {
-                    script {
-                        echo "⚡ Running Gradle build"
-                        def gradleHome = tool name: 'Gradle-8.3', type: 'gradle'
-                        bat "\"${gradleHome}/bin/gradle.bat\" clean build -Pversion=${env.APP_VERSION} -PNEXUS_USERNAME=${NEXUS_CREDS_USR} -PNEXUS_PASSWORD=${NEXUS_CREDS_PSW}"
+                    withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_CREDS_USR', passwordVariable: 'NEXUS_CREDS_PSW')]) {
+                        script {
+                            echo "⚡ Running Gradle build"
+                            def gradleHome = tool name: 'Gradle-8.3', type: 'Gradle'
+                            bat "${gradleHome}/bin/gradle.bat clean build -Pversion=${env.PROJECT_VERSION} -PNEXUS_USERNAME=${NEXUS_CREDS_USR} -PNEXUS_PASSWORD=${NEXUS_CREDS_PSW}"
+                        }
                     }
                 }
             }
 
             stage('Publish') {
                 steps {
-                    script {
-                        echo "⚡ Publishing to Nexus"
-                        def gradleHome = tool name: 'Gradle-8.3', type: 'gradle'
-
-                        // Automatically select snapshots vs releases repo
-                        def repoUrl = env.APP_VERSION.endsWith('SNAPSHOT') ?
-                            "https://nexus.yourcompany.com/repository/maven-snapshots/" :
-                            "https://nexus.yourcompany.com/repository/maven-releases/"
-
-                        bat "\"${gradleHome}/bin/gradle.bat\" publish -Pversion=${env.APP_VERSION} -PNEXUS_USERNAME=${NEXUS_CREDS_USR} -PNEXUS_PASSWORD=${NEXUS_CREDS_PSW} -PrepoUrl=${repoUrl}"
+                    withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_CREDS_USR', passwordVariable: 'NEXUS_CREDS_PSW')]) {
+                        script {
+                            echo "⚡ Publishing to Nexus"
+                            def gradleHome = tool name: 'Gradle-8.3', type: 'Gradle'
+                            bat "${gradleHome}/bin/gradle.bat publish -Pversion=${env.PROJECT_VERSION} -PNEXUS_USERNAME=${NEXUS_CREDS_USR} -PNEXUS_PASSWORD=${NEXUS_CREDS_PSW} -PrepoUrl=https://nexus.yourcompany.com/repository/maven-snapshots/"
+                        }
                     }
                 }
             }
@@ -73,7 +63,7 @@ def call() {
 
         post {
             success {
-                echo "✅ Build and publish succeeded!"
+                echo "✅ Build and publish completed successfully!"
             }
             failure {
                 echo "❌ Build or publish failed!"
