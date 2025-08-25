@@ -1,63 +1,73 @@
-def call() {
+def call(Map config = [:]) {
     pipeline {
         agent any
 
         environment {
-            NEXUS_USERNAME = credentials('nexus-username')
-            NEXUS_PASSWORD = credentials('nexus-password')
+            GRADLE_USER_HOME = "${env.WORKSPACE}/.gradle"
         }
 
         stages {
-            stage('Versioning') {
+            stage('Checkout') {
+                steps {
+                    checkout scm
+                }
+            }
+
+            stage('Set Version') {
                 steps {
                     script {
-                        // Read base version from Streaming repo's build.gradle
-                        def gradleFile = readFile("${env.WORKSPACE}/build.gradle")
-                        def matcher = gradleFile =~ /version\s*=\s*['"](.*)['"]/
-                        def baseVersion = matcher ? matcher[0][1] : "0.0.1"
-
-                        echo "📖 Base version from build.gradle: ${baseVersion}"
-
-                        // Branch-based suffix logic
-                        newVersion = baseVersion
-                        if (env.BRANCH_NAME == "develop") {
-                            newVersion = "${baseVersion}-SNAPSHOT"
-                        } else if (env.BRANCH_NAME == "release") {
-                            newVersion = "${baseVersion}-RC"
-                        } else if (env.BRANCH_NAME == "main" || env.BRANCH_NAME == "stg") {
-                            newVersion = baseVersion
+                        def baseVersion = "1.0.0"  // fallback, can also be from gradle.properties
+                        if (env.BRANCH_NAME == "main") {
+                            env.PROJECT_VERSION = baseVersion
+                        } else if (env.BRANCH_NAME == "develop") {
+                            env.PROJECT_VERSION = "${baseVersion}-SNAPSHOT"
                         } else {
-                            newVersion = "${baseVersion}-${env.BRANCH_NAME}"
+                            // feature/my-feature → 1.0.0-my-feature
+                            def safeBranch = env.BRANCH_NAME.replaceAll('[^a-zA-Z0-9.-]', '-')
+                            env.PROJECT_VERSION = "${baseVersion}-${safeBranch}"
                         }
-
-                        echo "📌 Final version: ${newVersion}"
-
-                        // Rewrite build.gradle so Gradle uses this version
-                        gradleFile = gradleFile.replaceAll(/version\s*=\s*['"].*['"]/, "version = '${newVersion}'")
-                        writeFile(file: "${env.WORKSPACE}/build.gradle", text: gradleFile)
+                        echo "📦 Using version: ${env.PROJECT_VERSION}"
                     }
                 }
             }
 
             stage('Build') {
                 steps {
-                    script {
-                        def gradle = new org.enbd.common.GradleWrapper(this)
-                        gradle.build("--stacktrace --no-daemon",
-                                     "clean build publish",
-                                     env.NEXUS_USERNAME,
-                                     env.NEXUS_PASSWORD,
-                                     "${env.WORKSPACE}/.gradle")
+                    withCredentials([usernamePassword(credentialsId: 'nexus-creds',
+                                                      usernameVariable: 'NEXUS_USERNAME',
+                                                      passwordVariable: 'NEXUS_PASSWORD')]) {
+                        sh """
+                            gradle7 -g ${env.GRADLE_USER_HOME} --stacktrace --no-daemon clean build \
+                              -Pversion=${env.PROJECT_VERSION} \
+                              -PNEXUS_USERNAME=$NEXUS_USERNAME \
+                              -PNEXUS_PASSWORD=$NEXUS_PASSWORD
+                        """
                     }
                 }
             }
 
             stage('Publish') {
                 steps {
-                    script {
-                        echo "🚀 Published version ${newVersion} to Nexus"
+                    withCredentials([usernamePassword(credentialsId: 'nexus-creds',
+                                                      usernameVariable: 'NEXUS_USERNAME',
+                                                      passwordVariable: 'NEXUS_PASSWORD')]) {
+                        sh """
+                            gradle7 -g ${env.GRADLE_USER_HOME} --stacktrace --no-daemon publish \
+                              -Pversion=${env.PROJECT_VERSION} \
+                              -PNEXUS_USERNAME=$NEXUS_USERNAME \
+                              -PNEXUS_PASSWORD=$NEXUS_PASSWORD
+                        """
                     }
                 }
+            }
+        }
+
+        post {
+            success {
+                echo "✅ Build and publish completed successfully. Version: ${env.PROJECT_VERSION}"
+            }
+            failure {
+                echo "❌ Build or publish failed."
             }
         }
     }
