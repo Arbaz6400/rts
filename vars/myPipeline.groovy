@@ -26,32 +26,17 @@ def call() {
                 }
             }
 
-            stage('Check Nexus Credentials') {
-                steps {
-                    withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_CREDS_USR', passwordVariable: 'NEXUS_CREDS_PSW')]) {
-                        echo "✅ Nexus credentials loaded"
-                    }
-                }
-            }
-
-            stage('Build') {
+            stage('Build & Publish') {
                 steps {
                     withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_CREDS_USR', passwordVariable: 'NEXUS_CREDS_PSW')]) {
                         script {
-                            echo "⚡ Running Gradle build"
+                            echo "⚡ Running Gradle build and publish"
                             def gradleHome = tool name: 'Gradle-8.3', type: 'Gradle'
+
+                            // Build
                             bat "${gradleHome}/bin/gradle.bat clean build -Pversion=${env.PROJECT_VERSION} -PNEXUS_USERNAME=${NEXUS_CREDS_USR} -PNEXUS_PASSWORD=${NEXUS_CREDS_PSW}"
-                        }
-                    }
-                }
-            }
 
-            stage('Publish') {
-                steps {
-                    withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_CREDS_USR', passwordVariable: 'NEXUS_CREDS_PSW')]) {
-                        script {
-                            echo "⚡ Publishing to Nexus"
-                            def gradleHome = tool name: 'Gradle-8.3', type: 'Gradle'
+                            // Publish
                             bat "${gradleHome}/bin/gradle.bat publish -Pversion=${env.PROJECT_VERSION} -PNEXUS_USERNAME=${NEXUS_CREDS_USR} -PNEXUS_PASSWORD=${NEXUS_CREDS_PSW} -PrepoUrl=https://nexus.yourcompany.com/repository/maven-snapshots/"
                         }
                     }
