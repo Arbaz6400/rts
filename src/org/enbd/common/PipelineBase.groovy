@@ -1,4 +1,4 @@
-package org.enbd.base
+package org.enbd.common
 
 class PipelineBase implements Serializable {
     def steps
