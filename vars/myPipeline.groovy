@@ -2,6 +2,10 @@ def call() {
     pipeline {
         agent any
 
+        tools {
+            gradle 'Gradle-8.3' // optional fallback if gradlew.bat is missing
+        }
+
         environment {
             PROJECT_VERSION = ""
         }
@@ -43,12 +47,25 @@ def call() {
                     withCredentials([usernamePassword(credentialsId: 'nexus-creds',
                                                       usernameVariable: 'NEXUS_USERNAME',
                                                       passwordVariable: 'NEXUS_PASSWORD')]) {
-                        bat """
-                            gradlew.bat clean build ^
-                              -Pversion=%PROJECT_VERSION% ^
-                              -PNEXUS_USERNAME=%NEXUS_USERNAME% ^
-                              -PNEXUS_PASSWORD=%NEXUS_PASSWORD%
-                        """
+                        script {
+                            def gradlewExists = fileExists("${env.WORKSPACE}/gradlew.bat")
+                            if (gradlewExists) {
+                                bat """
+                                    gradlew.bat clean build ^
+                                      -Pversion=${env.PROJECT_VERSION} ^
+                                      -PNEXUS_USERNAME=${env.NEXUS_USERNAME} ^
+                                      -PNEXUS_PASSWORD=${env.NEXUS_PASSWORD}
+                                """
+                            } else {
+                                echo "⚠️ gradlew.bat not found. Using Jenkins Gradle tool."
+                                bat """
+                                    gradle clean build ^
+                                      -Pversion=${env.PROJECT_VERSION} ^
+                                      -PNEXUS_USERNAME=${env.NEXUS_USERNAME} ^
+                                      -PNEXUS_PASSWORD=${env.NEXUS_PASSWORD}
+                                """
+                            }
+                        }
                     }
                 }
             }
@@ -58,12 +75,25 @@ def call() {
                     withCredentials([usernamePassword(credentialsId: 'nexus-creds',
                                                       usernameVariable: 'NEXUS_USERNAME',
                                                       passwordVariable: 'NEXUS_PASSWORD')]) {
-                        bat """
-                            gradlew.bat publish ^
-                              -Pversion=%PROJECT_VERSION% ^
-                              -PNEXUS_USERNAME=%NEXUS_USERNAME% ^
-                              -PNEXUS_PASSWORD=%NEXUS_PASSWORD%
-                        """
+                        script {
+                            def gradlewExists = fileExists("${env.WORKSPACE}/gradlew.bat")
+                            if (gradlewExists) {
+                                bat """
+                                    gradlew.bat publish ^
+                                      -Pversion=${env.PROJECT_VERSION} ^
+                                      -PNEXUS_USERNAME=${env.NEXUS_USERNAME} ^
+                                      -PNEXUS_PASSWORD=${env.NEXUS_PASSWORD}
+                                """
+                            } else {
+                                echo "⚠️ gradlew.bat not found. Using Jenkins Gradle tool."
+                                bat """
+                                    gradle publish ^
+                                      -Pversion=${env.PROJECT_VERSION} ^
+                                      -PNEXUS_USERNAME=${env.NEXUS_USERNAME} ^
+                                      -PNEXUS_PASSWORD=${env.NEXUS_PASSWORD}
+                                """
+                            }
+                        }
                     }
                 }
             }
