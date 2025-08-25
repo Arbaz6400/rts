@@ -1,32 +1,37 @@
 def call() {
     pipeline {
         agent any
+
         environment {
-            // Environment variables if needed
-            NEXUS_USERNAME = credentials('NEXUS_CREDS_USR')
-            NEXUS_PASSWORD = credentials('NEXUS_CREDS_PSW')
+            // Nexus credentials from Jenkins (username/password)
+            NEXUS = credentials('nexus-creds')
         }
+
         stages {
-
-            stage('Checkout SCM') {
-                steps {
-                    echo "🔄 Checking out source code..."
-                    checkout scm
-                }
-            }
-
             stage('Versioning') {
                 steps {
                     script {
-                        // Read build.gradle
-                        def gradleFile = readFile('build.gradle')
-                        echo "📖 Base version from build.gradle: ${gradleFile}"
+                        // Read build.gradle from Streaming repo
+                        def gradleFile = readFile("${env.WORKSPACE}/build.gradle")
 
-                        // Extract version using regex
-                        def matcher = gradleFile =~ /version\s*=\s*['"](.+?)['"]/
-                        env.PROJECT_VERSION = matcher ? matcher[0][1] : '1.0.0'
+                        // Match version = '1.0.0' or version = "1.0.0"
+                        def matcher = gradleFile =~ /version\s*=\s*['"](.*)['"]/
+                        def baseVersion = matcher ? matcher[0][1] : "0.0.1"
 
-                        echo "📌 Using version: ${env.PROJECT_VERSION}"
+                        echo "📖 Base version from build.gradle: ${baseVersion}"
+
+                        // Branch-based suffix logic
+                        def newVersion = baseVersion
+                        if (env.BRANCH_NAME == "develop") {
+                            newVersion = "${baseVersion}-SNAPSHOT"
+                        } else if (env.BRANCH_NAME == "release") {
+                            newVersion = "${baseVersion}-RC"
+                        } else if (env.BRANCH_NAME == "main" || env.BRANCH_NAME == "stg") {
+                            newVersion = baseVersion
+                        }
+
+                        env.APP_VERSION = newVersion
+                        echo "📌 Using version: ${env.APP_VERSION}"
                     }
                 }
             }
@@ -34,16 +39,14 @@ def call() {
             stage('Build & Publish') {
                 steps {
                     script {
-                        echo "⚡ Running Gradle build and publish..."
+                        echo "⚡ Running Gradle build and publish"
 
-                        // Use Gradle tool
-                        def gradleHome = tool name: 'Gradle-8.3', type: 'Gradle'
-
-                        // Build
-                        bat "${gradleHome}\\bin\\gradle.bat clean build -Pversion=${env.PROJECT_VERSION} -PNEXUS_USERNAME=${env.NEXUS_USERNAME} -PNEXUS_PASSWORD=${env.NEXUS_PASSWORD}"
-
-                        // Publish
-                        bat "${gradleHome}\\bin\\gradle.bat publish -Pversion=${env.PROJECT_VERSION} -PNEXUS_USERNAME=${env.NEXUS_USERNAME} -PNEXUS_PASSWORD=${env.NEXUS_PASSWORD}"
+                        // Use Gradle wrapper instead of Jenkins tool
+                        if (isUnix()) {
+                            sh "./gradlew clean build publish -PnexusUsername=${env.NEXUS_USR} -PnexusPassword=${env.NEXUS_PSW} -Pversion=${env.APP_VERSION}"
+                        } else {
+                            bat "gradlew.bat clean build publish -PnexusUsername=%NEXUS_USR% -PnexusPassword=%NEXUS_PSW% -Pversion=%APP_VERSION%"
+                        }
                     }
                 }
             }
@@ -51,7 +54,7 @@ def call() {
 
         post {
             success {
-                echo "✅ Build & publish succeeded!"
+                echo "✅ Build and publish succeeded!"
             }
             failure {
                 echo "❌ Build or publish failed!"
