@@ -1,47 +1,40 @@
 package org.enbd.common
 
-import org.enbd.base.CheckmarxBase
-
-/**
- * Wrapper for Gradle operations
- */
 class GradleWrapper extends CheckmarxBase {
 
     private String gradleBinary
     private String gradleHome
 
-    GradleWrapper(def steps) {
+    GradleWrapper(steps) {
         super(steps)
-        this.gradleBinary = "gradle7"
+        // Always prefer wrapper – works cross-platform
+        this.gradleBinary = "./gradlew"
     }
 
-    private def run(String gradleArgs, String gradleTasks, String username, String password, String gradleHome) {
-        steps.sh """
-            export GRADLE_USER_HOME=${gradleHome}
-            ${this.gradleBinary} -g ${gradleHome} --stacktrace --no-daemon ${gradleArgs} ${gradleTasks} \
-            -PNEXUS_USERNAME=${username} -PNEXUS_PASSWORD=${password}
+    private def run(String gradle_args, String gradle_tasks, String username, String password, String gradle_home) {
+        this.steps.sh """
+            export GRADLE_USER_HOME=${gradle_home}
+            ${this.gradleBinary} -g ${gradle_home} --stacktrace --no-daemon ${gradle_args} ${gradle_tasks} \
+                -PNEXUS_USERNAME=${username} -PNEXUS_PASSWORD=${password}
         """
     }
 
-    public def build(String gradleArgs, String gradleTasks, String username, String password, String gradleHome) {
-        this.run(gradleArgs, gradleTasks, username, password, gradleHome)
+    public def build(String gradle_args, String gradle_tasks, String username, String password, String gradle_home) {
+        this.run(gradle_args, gradle_tasks, username, password, gradle_home)
         this.steps.junit allowEmptyResults: true, testResults: 'build/test-results/test/*.xml'
     }
 
-    public def release(String gradleArgs, String gradleTasks, String nexusUsername, String nexusPassword, String gradleHome) {
+    public def release(String gradle_args, String gradle_tasks, String nexus_username, String nexus_password, String gradle_home) {
         printGitState()
-        this.run(gradleArgs, gradleTasks, nexusUsername, nexusPassword, gradleHome)
+        this.run(gradle_args, gradle_tasks, nexus_username, nexus_password, gradle_home)
         printGitState()
     }
 
-    def pushTags(String gitRepo, String username, String password) {
-        def result = this.steps.sh(
-            script: "git push https://${username}:${password}@${gitRepo} --tags",
+    def pushTags(String git_repo, String username, String password) {
+        this.steps.sh(
+            script: "git push https://${username}:${password}@${git_repo} --tags",
             returnStatus: true
         )
-        if (result != 0) {
-            this.steps.error("Failed to push tags to ${gitRepo}")
-        }
     }
 
     def printGitState() {
