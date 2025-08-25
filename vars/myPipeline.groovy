@@ -7,36 +7,39 @@ def call() {
         }
 
         stages {
-            stage('Checkout') {
-                steps {
-                    checkout scm
-                }
-            }
-
             stage('Versioning') {
                 steps {
                     script {
-                        // Adjust this path if build.gradle is inside a subfolder
+                        // Check if build.gradle exists
                         def gradleFilePath = "${env.WORKSPACE}/build.gradle"
                         if (!fileExists(gradleFilePath)) {
                             error "build.gradle not found at ${gradleFilePath}"
                         }
 
+                        // Read build.gradle
                         def gradleFile = readFile(gradleFilePath)
                         def matcher = gradleFile =~ /version\s*=\s*['"](.*)['"]/
                         def baseVersion = matcher ? matcher[0][1] : "0.0.1"
 
                         echo "📖 Base version from build.gradle: ${baseVersion}"
 
+                        // Detect branch
+                        def branchName = env.BRANCH_NAME ?: "unknown"
+                        echo "🔖 Branch detected: ${branchName}"
+
+                        // Determine version based on branch
                         def newVersion = baseVersion
-                        if (env.BRANCH_NAME == "develop") {
+                        if (branchName == "develop") {
                             newVersion = "${baseVersion}-SNAPSHOT"
-                        } else if (env.BRANCH_NAME == "release") {
+                        } else if (branchName == "release") {
                             newVersion = "${baseVersion}-RC"
-                        } else if (env.BRANCH_NAME == "main" || env.BRANCH_NAME == "stg") {
+                        } else if (branchName in ["main", "stg"]) {
                             newVersion = baseVersion
+                        } else {
+                            newVersion = "${baseVersion}-DEV"
                         }
 
+                        // Save for downstream stages
                         env.PROJECT_VERSION = newVersion
                         echo "📌 Using version: ${env.PROJECT_VERSION}"
                     }
@@ -49,28 +52,24 @@ def call() {
                                                       usernameVariable: 'NEXUS_USERNAME',
                                                       passwordVariable: 'NEXUS_PASSWORD')]) {
                         script {
-                            def gradlewPath = isUnix() ? "./gradlew" : "gradlew.bat"
-
-                            if (!fileExists("${env.WORKSPACE}/${gradlewPath}")) {
-                                error "${gradlewPath} not found in workspace. Please commit Gradle wrapper."
-                            }
-
-                            if (isUnix()) {
-                                sh """
-                                    ${gradlewPath} clean build \\
-                                        -Pversion=${env.PROJECT_VERSION} \\
-                                        -PNEXUS_USERNAME=${env.NEXUS_USERNAME} \\
-                                        -PNEXUS_PASSWORD=${env.NEXUS_PASSWORD}
+                            def gradlewPath = "${env.WORKSPACE}/gradlew.bat"
+                            if (fileExists(gradlewPath)) {
+                                echo "⚡ Using Gradle wrapper"
+                                bat """
+                                    gradlew.bat clean build ^
+                                        -Pversion=%PROJECT_VERSION% ^
+                                        -PNEXUS_USERNAME=%NEXUS_USERNAME% ^
+                                        -PNEXUS_PASSWORD=%NEXUS_PASSWORD%
                                 """
                             } else {
-                                bat(script: """
-                                    ${gradlewPath} clean build ^
-                                        -Pversion=${env.PROJECT_VERSION}
-                                """,
-                                env: [
-                                    "NEXUS_USERNAME=${env.NEXUS_USERNAME}",
-                                    "NEXUS_PASSWORD=${env.NEXUS_PASSWORD}"
-                                ])
+                                echo "⚠️ Gradle wrapper not found. Using Jenkins Gradle tool"
+                                def gradleHome = tool name: 'Gradle-8.3', type: 'gradle'
+                                bat """
+                                    "${gradleHome}/bin/gradle.bat" clean build ^
+                                        -Pversion=%PROJECT_VERSION% ^
+                                        -PNEXUS_USERNAME=%NEXUS_USERNAME% ^
+                                        -PNEXUS_PASSWORD=%NEXUS_PASSWORD%
+                                """
                             }
                         }
                     }
@@ -83,24 +82,22 @@ def call() {
                                                       usernameVariable: 'NEXUS_USERNAME',
                                                       passwordVariable: 'NEXUS_PASSWORD')]) {
                         script {
-                            def gradlewPath = isUnix() ? "./gradlew" : "gradlew.bat"
-
-                            if (isUnix()) {
-                                sh """
-                                    ${gradlewPath} publish \\
-                                        -Pversion=${env.PROJECT_VERSION} \\
-                                        -PNEXUS_USERNAME=${env.NEXUS_USERNAME} \\
-                                        -PNEXUS_PASSWORD=${env.NEXUS_PASSWORD}
+                            def gradlewPath = "${env.WORKSPACE}/gradlew.bat"
+                            if (fileExists(gradlewPath)) {
+                                bat """
+                                    gradlew.bat publish ^
+                                        -Pversion=%PROJECT_VERSION% ^
+                                        -PNEXUS_USERNAME=%NEXUS_USERNAME% ^
+                                        -PNEXUS_PASSWORD=%NEXUS_PASSWORD%
                                 """
                             } else {
-                                bat(script: """
-                                    ${gradlewPath} publish ^
-                                        -Pversion=${env.PROJECT_VERSION}
-                                """,
-                                env: [
-                                    "NEXUS_USERNAME=${env.NEXUS_USERNAME}",
-                                    "NEXUS_PASSWORD=${env.NEXUS_PASSWORD}"
-                                ])
+                                def gradleHome = tool name: 'Gradle-8.3', type: 'gradle'
+                                bat """
+                                    "${gradleHome}/bin/gradle.bat" publish ^
+                                        -Pversion=%PROJECT_VERSION% ^
+                                        -PNEXUS_USERNAME=%NEXUS_USERNAME% ^
+                                        -PNEXUS_PASSWORD=%NEXUS_PASSWORD%
+                                """
                             }
                         }
                     }
@@ -110,7 +107,7 @@ def call() {
 
         post {
             success {
-                echo "✅ Build and publish completed successfully!"
+                echo "✅ Build and publish completed successfully! Version: ${env.PROJECT_VERSION}"
             }
             failure {
                 echo "❌ Build or publish failed."
