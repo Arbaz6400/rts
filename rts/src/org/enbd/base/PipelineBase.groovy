@@ -1,11 +1,6 @@
 package org.enbd.base
 
-/**
- * Base class for pipeline steps.
- * Provides common utilities for Jenkins pipelines.
- */
 class PipelineBase implements Serializable {
-
     def steps
 
     PipelineBase(steps) {
