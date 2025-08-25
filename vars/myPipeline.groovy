@@ -3,12 +3,11 @@ def call() {
         agent any
 
         environment {
-            // Gradle tool name configured in Jenkins (optional if wrapper exists)
-            GRADLE_TOOL = "Gradle-8.3"
+            // keep your nexus credentials configured in Jenkins
+            NEXUS_CREDS = credentials('nexus-creds')
         }
 
         stages {
-
             stage('Checkout SCM') {
                 steps {
                     checkout scm
@@ -18,82 +17,55 @@ def call() {
             stage('Versioning') {
                 steps {
                     script {
-                        def gradleFilePath = "${env.WORKSPACE}/build.gradle"
-                        if (!fileExists(gradleFilePath)) {
-                            error "❌ build.gradle not found in workspace!"
-                        }
-
-                        def gradleFile = readFile(gradleFilePath)
+                        def gradleFile = readFile("${env.WORKSPACE}/build.gradle")
                         def matcher = gradleFile =~ /version\s*=\s*['"](.*)['"]/
                         def baseVersion = matcher ? matcher[0][1] : "0.0.1"
-
                         echo "📖 Base version from build.gradle: ${baseVersion}"
 
-                        // Branch-based suffix logic
+                        // Branch-based version suffix
                         if (env.BRANCH_NAME == "develop") {
-                            env.NEW_VERSION = "${baseVersion}-SNAPSHOT"
+                            env.APP_VERSION = "${baseVersion}-SNAPSHOT"
                         } else if (env.BRANCH_NAME == "release") {
-                            env.NEW_VERSION = "${baseVersion}-RC"
-                        } else {
-                            env.NEW_VERSION = baseVersion
+                            env.APP_VERSION = "${baseVersion}-RC"
+                        } else if (env.BRANCH_NAME == "main" || env.BRANCH_NAME == "stg") {
+                            env.APP_VERSION = baseVersion
                         }
 
-                        echo "📌 Using version: ${env.NEW_VERSION}"
+                        echo "📌 Using version: ${env.APP_VERSION}"
                     }
                 }
             }
 
-            stage('Check Credentials') {
+            stage('Check Nexus Credentials') {
                 steps {
-                    withCredentials([usernamePassword(
-                        credentialsId: 'nexus-creds', 
-                        usernameVariable: 'NEXUS_USERNAME', 
-                        passwordVariable: 'NEXUS_PASSWORD'
-                    )]) {
-                        script {
-                            if (!env.NEXUS_USERNAME || !env.NEXUS_PASSWORD) {
-                                error "❌ Nexus credentials not loaded!"
-                            } else {
-                                echo "✅ Nexus credentials loaded"
-                            }
-                        }
+                    script {
+                        echo "✅ Nexus credentials loaded"
                     }
                 }
             }
 
             stage('Build') {
                 steps {
-                    withCredentials([usernamePassword(
-                        credentialsId: 'nexus-creds', 
-                        usernameVariable: 'NEXUS_USERNAME', 
-                        passwordVariable: 'NEXUS_PASSWORD'
-                    )]) {
-                        script {
-                            // Use Gradle wrapper if present, otherwise Jenkins tool
-                            def gradleCmd = fileExists("${env.WORKSPACE}/gradlew.bat") ? 
-                                "${env.WORKSPACE}/gradlew.bat" : 
-                                "${tool(env.GRADLE_TOOL)}/bin/gradle.bat"
-
-                            bat "\"${gradleCmd}\" clean build -Pversion=${env.NEW_VERSION} -PNEXUS_USERNAME=%NEXUS_USERNAME% -PNEXUS_PASSWORD=%NEXUS_PASSWORD%"
-                        }
+                    script {
+                        echo "⚡ Running Gradle build"
+                        def gradleHome = tool name: 'Gradle-8.3', type: 'gradle'
+                        bat "\"${gradleHome}/bin/gradle.bat\" clean build -Pversion=${env.APP_VERSION} -PNEXUS_USERNAME=${NEXUS_CREDS_USR} -PNEXUS_PASSWORD=${NEXUS_CREDS_PSW}"
                     }
                 }
             }
 
             stage('Publish') {
                 steps {
-                    withCredentials([usernamePassword(
-                        credentialsId: 'nexus-creds', 
-                        usernameVariable: 'NEXUS_USERNAME', 
-                        passwordVariable: 'NEXUS_PASSWORD'
-                    )]) {
-                        script {
-                            def gradleCmd = fileExists("${env.WORKSPACE}/gradlew.bat") ? 
-                                "${env.WORKSPACE}/gradlew.bat" : 
-                                "${tool(env.GRADLE_TOOL)}/bin/gradle.bat"
+                    script {
+                        echo "⚡ Publishing to Nexus"
+                        def gradleHome = tool name: 'Gradle-8.3', type: 'gradle'
 
-                            bat "\"${gradleCmd}\" publish -Pversion=${env.NEW_VERSION} -PNEXUS_USERNAME=%NEXUS_USERNAME% -PNEXUS_PASSWORD=%NEXUS_PASSWORD%"
-                        }
+                        // Automatically select snapshots vs releases repo
+                        def repoUrl = env.APP_VERSION.endsWith('SNAPSHOT') ?
+                            "https://nexus.yourcompany.com/repository/maven-snapshots/" :
+                            "https://nexus.yourcompany.com/repository/maven-releases/"
+
+                        bat "\"${gradleHome}/bin/gradle.bat\" publish -Pversion=${env.APP_VERSION} -PNEXUS_USERNAME=${NEXUS_CREDS_USR} -PNEXUS_PASSWORD=${NEXUS_CREDS_PSW} -PrepoUrl=${repoUrl}"
                     }
                 }
             }
