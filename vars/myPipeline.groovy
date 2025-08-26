@@ -1,31 +1,40 @@
 import org.enbd.common.GradleWrapper
 import org.enbd.common.NexusRest
 
-
-def call(Map config = [:]) {
-    // Define gradleWrapper here
-    def gradleWrapper = new GradleWrapper(steps: this) // assuming GradleWrapper accepts steps
-
-    // Configurable variables with defaults
-    def git_repo = config.git_repo ?: "https://github.com/Arbaz6400/Streaming.git"
-    def nexusRepository = config.nexusRepository ?: "maven-releases"
-    def engNexusRepository = config.engNexusRepository ?: "maven-snapshots"
-    def skipTagging = config.skipTagging ?: false
-    def gradle_home = config.gradle_home ?: "C:/gradle"
-
+// vars/myPipeline.groovy
+def call() {
     pipeline {
         agent any
 
         environment {
             NEXUS = credentials('nexus-creds')
-            GRADLE_HOME = gradle_home
+            // Do not set GRADLE_HOME here; will be set dynamically in script
         }
 
         stages {
+            stage('Setup Gradle Home') {
+                steps {
+                    script {
+                        // Groovy variable
+                        def gradle_home = "C:/gradle"
+
+                        // Export as environment variable
+                        env.GRADLE_HOME = gradle_home
+                        echo "GRADLE_HOME set to: ${env.GRADLE_HOME}"
+
+                        // Initialize gradleWrapper and nexusRest
+                        gradleWrapper = new GradleWrapper(steps: this)
+                        nexusRest = new NexusRest(this)
+                    }
+                }
+            }
+
             stage('Perform Gradle Release') {
                 when {
-                    not { triggeredBy 'TimerTrigger' }
-                    expression { return env.BRANCH_NAME == 'master' }
+                    allOf {
+                        branch 'master'
+                        not { triggeredBy 'TimerTrigger' }
+                    }
                 }
                 steps {
                     script {
@@ -41,7 +50,7 @@ def call(Map config = [:]) {
                                 '-Prelease tag',
                                 env.NEXUS_USERNAME,
                                 env.NEXUS_PASSWORD,
-                                gradle_home
+                                env.GRADLE_HOME
                             )
                         }
                     }
@@ -53,6 +62,7 @@ def call(Map config = [:]) {
                     script {
                         def shadowJar = true
                         echo "Gradle tasks: clean build publish"
+
                         withCredentials([
                             usernamePassword(
                                 credentialsId: 'nexus-creds',
@@ -61,13 +71,11 @@ def call(Map config = [:]) {
                             )
                         ]) {
                             gradleWrapper.printGitState()
-                            gradleBuild(
-                                gradleWrapper,
-                                gradle_args,
-                                gradle_tasks + ' printVersion',
-                                env.NEXUS_USERNAME,
-                                env.NEXUS_PASSWORD,
-                                gradle_home
+                            gradleWrapper.build(
+                                tasks: 'clean build publish printVersion',
+                                username: env.NEXUS_USERNAME,
+                                password: env.NEXUS_PASSWORD,
+                                gradleHome: env.GRADLE_HOME
                             )
                         }
                     }
@@ -75,9 +83,7 @@ def call(Map config = [:]) {
             }
 
             stage('Push to Nexus') {
-                when {
-                    not { triggeredBy 'TimerTrigger' }
-                }
+                when { not { triggeredBy 'TimerTrigger' } }
                 steps {
                     script {
                         def branch = env.BRANCH_NAME
@@ -85,19 +91,23 @@ def call(Map config = [:]) {
                         def pomLocation = 'build/publications/mavenJava/pom-default.xml'
                         def pom = readMavenPom file: pomLocation
                         def isSnapshot = pom.version.contains('SNAPSHOT')
-                        def nexusRepo = isSnapshot ? engNexusRepository : nexusRepository
+                        def repoType = isSnapshot ? 'snapshot' : 'release'
+                        def nexusRepo = "nexus-${repoType}"
+                        def engNexusRepo = "eng-nexus-${repoType}"
+                        def shadowJar = true
+                        def verbose = false
 
                         if (isMaster && !isSnapshot) {
-                            echo "Uploading to Prod Nexus..."
-                            nexusRest.uploadReleaseProdNexus(pomLocation, nexusRepository, shadowJar)
+                            echo "Uploading to Production Nexus..."
+                            nexusRest.uploadReleaseProdNexus(pomLocation, nexusRepo, shadowJar)
                         } else {
                             echo "Uploading to Engineering Nexus..."
                             nexusRest.uploadEngNexusArtifact(
                                 pomLocation,
-                                nexusRepo,
+                                engNexusRepo,
                                 shadowJar,
                                 "${env.NEXUS_USERNAME}:${env.NEXUS_PASSWORD}",
-                                false
+                                verbose
                             )
                         }
                     }
@@ -106,9 +116,11 @@ def call(Map config = [:]) {
 
             stage('Push Production Release Tag') {
                 when {
-                    branch 'master'
-                    not { triggeredBy 'TimerTrigger' }
-                    expression { return !skipTagging }
+                    allOf {
+                        branch 'master'
+                        not { triggeredBy 'TimerTrigger' }
+                        expression { return !skipTagging }
+                    }
                 }
                 steps {
                     script {
@@ -120,9 +132,9 @@ def call(Map config = [:]) {
                             )
                         ]) {
                             gradleWrapper.pushTags(
-                                git_repo,
-                                env.GITHUB_USERNAME,
-                                env.GITHUB_PASSWORD
+                                gitRepo: git_repo,
+                                username: env.GITHUB_USERNAME,
+                                password: env.GITHUB_PASSWORD
                             )
                         }
                     }
