@@ -1,64 +1,163 @@
+package vars
+
 def call() {
     pipeline {
         agent any
 
         environment {
-            // Nexus credentials from Jenkins (username/password)
+            // Nexus credentials stored in Jenkins
             NEXUS = credentials('nexus-creds')
-            // Ensure Gradle is on PATH (Chocolatey installation path)
-            PATH = "C:\\ProgramData\\chocolatey\\bin;${env.PATH}"
+
+            // Local Gradle home path
+            gradle_home = "C:/gradle"
+
+            // Dummy repos
+            git_repo = "https://github.com/yourorg/yourrepo.git"
+            nexusRepository = "prod-nexus-repo"
+            engNexusRepository = "eng-nexus-repo"
+
+            // Gradle build args
+            gradle_args = ""
+            gradle_tasks = "clean build publish"
+
+            // Control Git tagging
+            skipTagging = false
         }
 
         stages {
-            stage('Versioning') {
+            stage('Perform Gradle Release') {
+                when {
+                    not { triggeredBy 'TimerTrigger' }
+                    expression { return env.BRANCH_NAME == 'master' }
+                }
                 steps {
                     script {
-                        // Read build.gradle from Streaming repo
-                        def gradleFile = readFile("${env.WORKSPACE}/build.gradle")
-
-                        // Match version = '1.0.0' or version = "1.0.0"
-                        def matcher = gradleFile =~ /version\s*=\s*['"](.*)['"]/
-                        def baseVersion = matcher ? matcher[0][1] : "0.0.1"
-
-                        echo "📖 Base version from build.gradle: ${baseVersion}"
-
-                        // Branch-based suffix logic
-                        def newVersion = baseVersion
-                        if (env.BRANCH_NAME == "develop") {
-                            newVersion = "${baseVersion}-SNAPSHOT"
-                        } else if (env.BRANCH_NAME == "release") {
-                            newVersion = "${baseVersion}-RC"
-                        } else if (env.BRANCH_NAME == "main" || env.BRANCH_NAME == "stg") {
-                            newVersion = baseVersion
+                        def gradleWrapper = new org.enbd.common.GradleWrapper(steps)
+                        withCredentials([
+                            usernamePassword(
+                                credentialsId: 'nexus-creds',
+                                usernameVariable: 'NEXUS_USERNAME',
+                                passwordVariable: 'NEXUS_PASSWORD'
+                            )
+                        ]) {
+                            gradleWrapper.release(
+                                'clean',
+                                '-Prelease tag',
+                                "${NEXUS_USERNAME}",
+                                "${NEXUS_PASSWORD}",
+                                gradle_home
+                            )
                         }
-
-                        env.APP_VERSION = newVersion
-                        echo "📌 Using version: ${env.APP_VERSION}"
                     }
                 }
             }
 
-            stage('Build & Publish') {
+            stage('Perform Gradle Build') {
                 steps {
                     script {
-                        echo "⚡ Running Gradle build and publish"
+                        def gradleWrapper = new org.enbd.common.GradleWrapper(steps)
+                        def shadowJar = true
+                        echo "Gradle tasks: ${gradle_tasks}"
 
-                        if (isUnix()) {
-                            sh "./gradlew clean build publish -PnexusUsername=${env.NEXUS_USR} -PnexusPassword=${env.NEXUS_PSW} -Pversion=${env.APP_VERSION}"
+                        withCredentials([
+                            usernamePassword(
+                                credentialsId: 'nexus-creds',
+                                usernameVariable: 'NEXUS_USERNAME',
+                                passwordVariable: 'NEXUS_PASSWORD'
+                            )
+                        ]) {
+                            gradleWrapper.printGitState()
+
+                            // Capture version from Gradle
+                            def versionOutput = sh(
+                                script: "${gradle_home}/gradle printVersion -q",
+                                returnStdout: true
+                            ).trim()
+                            echo "Base Version from Gradle: ${versionOutput}"
+
+                            // Append suffix
+                            def finalVersion = "${versionOutput}-SNAPSHOT"
+                            echo "Version with Suffix: ${finalVersion}"
+
+                            // Store for other stages
+                            env.PROJECT_VERSION = finalVersion
+
+                            // Run the build
+                            gradleBuild(
+                                gradleWrapper,
+                                gradle_args,
+                                gradle_tasks,
+                                "${NEXUS_USERNAME}",
+                                "${NEXUS_PASSWORD}",
+                                gradle_home
+                            )
+                        }
+                    }
+                }
+            }
+
+            stage('Push to Nexus') {
+                when {
+                    not { triggeredBy 'TimerTrigger' }
+                }
+                steps {
+                    unstash 'build'
+                    script {
+                        def gradleWrapper = new org.enbd.common.GradleWrapper(steps)
+                        def nexuskest = new org.enbd.common.NexusRest(steps)
+
+                        def branch = env.BRANCH_NAME
+                        def isMaster = (branch == 'master')
+                        def pomLocation = 'build/publications/mavenJava/pom-default.xml'
+                        def pom = readMavenPom file: pomLocation
+                        def versionToUse = env.PROJECT_VERSION ?: pom.version
+                        def isSnapshot = versionToUse.contains('SNAPSHOT')
+                        def repoType = isSnapshot ? 'snapshot' : 'release'
+                        def nexusRepo = "${nexusRepository}-${repoType}"
+                        def engNexusRepo = "${engNexusRepository}-${repoType}"
+                        def verbose = false
+
+                        if (isMaster && !isSnapshot) {
+                            echo "Uploading to Prod Nexus..."
+                            nexuskest.uploadReleaseProdNexus(pomLocation, nexusRepo, shadowJar)
                         } else {
-                            bat "gradle clean build publish -PnexusUsername=%NEXUS_USR% -PnexusPassword=%NEXUS_PSW% -Pversion=%APP_VERSION%"
+                            echo "Uploading to Engineering Nexus..."
+                            nexuskest.uploadEngNexusArtifact(
+                                pomLocation,
+                                engNexusRepo,
+                                shadowJar,
+                                "${env.NEXUS_USERNAME}:${env.NEXUS_PASSWORD}",
+                                verbose
+                            )
                         }
                     }
                 }
             }
-        }
 
-        post {
-            success {
-                echo "✅ Build and publish succeeded!"
-            }
-            failure {
-                echo "❌ Build or publish failed!"
+            stage('Push Production Release Tag') {
+                when {
+                    branch 'master'
+                    not { triggeredBy 'TimerTrigger' }
+                    expression { return !skipTagging }
+                }
+                steps {
+                    script {
+                        def gradleWrapper = new org.enbd.common.GradleWrapper(steps)
+                        withCredentials([
+                            usernamePassword(
+                                credentialsId: 'GITBDMPRODUSR',
+                                usernameVariable: 'GITHUB_USERNAME',
+                                passwordVariable: 'GITHUB_PASSWORD'
+                            )
+                        ]) {
+                            gradleWrapper.pushTags(
+                                git_repo,
+                                "${GITHUB_USERNAME}",
+                                "${GITHUB_PASSWORD}"
+                            )
+                        }
+                    }
+                }
             }
         }
     }
