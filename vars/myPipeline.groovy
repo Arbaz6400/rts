@@ -1,3 +1,7 @@
+import org.enbd.common.GradleWrapper
+import org.enbd.common.NexusRest
+
+
 def call(Map config = [:]) {
     // Define gradleWrapper here
     def gradleWrapper = new GradleWrapper(steps: this) // assuming GradleWrapper accepts steps
