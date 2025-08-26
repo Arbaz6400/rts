@@ -1,26 +1,26 @@
-def call(String pomFile = 'pom.xml', String nexusRepo = 'prod-repo') {
+// streamingPipeline.groovy
+def call() {
     pipeline {
         agent any
 
+        environment {
+            APP_VERSION = ''
+        }
+
         stages {
+            stage('Checkout SCM') {
+                steps {
+                    checkout scm
+                }
+            }
+
             stage('Versioning') {
                 steps {
                     script {
-                        // Read build.gradle in the workspace
-                        def gradleFile = readFile("${env.WORKSPACE}/build.gradle")
-                        def matcher = gradleFile =~ /version\s*=\s*['"](.*)['"]/
-                        def baseVersion = matcher ? matcher[0][1] : "0.0.1"
-
-                        // Branch-based suffix logic
-                        def newVersion = baseVersion
-                        if (env.BRANCH_NAME == "develop") {
-                            newVersion = "${baseVersion}-SNAPSHOT"
-                        } else if (env.BRANCH_NAME == "release") {
-                            newVersion = "${baseVersion}-RC"
-                        }
-
-                        echo "📌 Computed version: ${newVersion}"
-                        env.APP_VERSION = newVersion
+                        // Example: compute version (you can replace this with actual logic)
+                        def version = "1.0.0-SNAPSHOT"
+                        env.APP_VERSION = version
+                        echo "📌 Computed version: ${version}"
                     }
                 }
             }
@@ -28,7 +28,8 @@ def call(String pomFile = 'pom.xml', String nexusRepo = 'prod-repo') {
             stage('Upload to Nexus') {
                 steps {
                     script {
-                        nexusUpload(pomFile, nexusRepo, true, env.APP_VERSION)
+                        // Only pass version + repo
+                        nexusUpload(env.APP_VERSION, "prod-repo")
                     }
                 }
             }
