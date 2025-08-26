@@ -1,8 +1,8 @@
 def call(Map config = [:]) {
     // Define gradleWrapper here
-    def gradleWrapper = new GradleWrapper(steps: this)  // assuming GradleWrapper class accepts steps
+    def gradleWrapper = new GradleWrapper(steps: this) // assuming GradleWrapper accepts steps
 
-    // Environment variables
+    // Configurable variables with defaults
     def git_repo = config.git_repo ?: "https://github.com/Arbaz6400/Streaming.git"
     def nexusRepository = config.nexusRepository ?: "maven-releases"
     def engNexusRepository = config.engNexusRepository ?: "maven-snapshots"
@@ -27,16 +27,16 @@ def call(Map config = [:]) {
                     script {
                         withCredentials([
                             usernamePassword(
-                                credentialsId: 'nexus-creds', 
-                                usernameVariable: 'NEXUS_USERNAME', 
+                                credentialsId: 'nexus-creds',
+                                usernameVariable: 'NEXUS_USERNAME',
                                 passwordVariable: 'NEXUS_PASSWORD'
                             )
                         ]) {
                             gradleWrapper.release(
-                                'clean', 
-                                '-Prelease tag', 
-                                env.NEXUS_USERNAME, 
-                                env.NEXUS_PASSWORD, 
+                                'clean',
+                                '-Prelease tag',
+                                env.NEXUS_USERNAME,
+                                env.NEXUS_PASSWORD,
                                 gradle_home
                             )
                         }
@@ -51,18 +51,18 @@ def call(Map config = [:]) {
                         echo "Gradle tasks: clean build publish"
                         withCredentials([
                             usernamePassword(
-                                credentialsId: 'nexus-creds', 
-                                usernameVariable: 'NEXUS_USERNAME', 
+                                credentialsId: 'nexus-creds',
+                                usernameVariable: 'NEXUS_USERNAME',
                                 passwordVariable: 'NEXUS_PASSWORD'
                             )
                         ]) {
                             gradleWrapper.printGitState()
                             gradleBuild(
-                                gradleWrapper, 
-                                gradle_args, 
-                                gradle_tasks += 'printVersion', 
-                                env.NEXUS_USERNAME, 
-                                env.NEXUS_PASSWORD, 
+                                gradleWrapper,
+                                gradle_args,
+                                gradle_tasks + ' printVersion',
+                                env.NEXUS_USERNAME,
+                                env.NEXUS_PASSWORD,
                                 gradle_home
                             )
                         }
@@ -89,10 +89,10 @@ def call(Map config = [:]) {
                         } else {
                             echo "Uploading to Engineering Nexus..."
                             nexusRest.uploadEngNexusArtifact(
-                                pomLocation, 
-                                nexusRepo, 
-                                shadowJar, 
-                                "${env.NEXUS_USERNAME}:${env.NEXUS_PASSWORD}", 
+                                pomLocation,
+                                nexusRepo,
+                                shadowJar,
+                                "${env.NEXUS_USERNAME}:${env.NEXUS_PASSWORD}",
                                 false
                             )
                         }
@@ -104,21 +104,21 @@ def call(Map config = [:]) {
                 when {
                     branch 'master'
                     not { triggeredBy 'TimerTrigger' }
-                    expression { return !skipTagging } 
+                    expression { return !skipTagging }
                 }
                 steps {
                     script {
                         withCredentials([
                             usernamePassword(
-                                credentialsId: 'GITBDMPRODUSR', 
-                                usernameVariable: 'GITHUB_USERNAME', 
+                                credentialsId: 'GITBDMPRODUSR',
+                                usernameVariable: 'GITHUB_USERNAME',
                                 passwordVariable: 'GITHUB_PASSWORD'
                             )
                         ]) {
                             gradleWrapper.pushTags(
-                                git_repo, 
-                                "${env.GITHUB_USERNAME}", 
-                                "${env.GITHUB_PASSWORD}"
+                                git_repo,
+                                env.GITHUB_USERNAME,
+                                env.GITHUB_PASSWORD
                             )
                         }
                     }
