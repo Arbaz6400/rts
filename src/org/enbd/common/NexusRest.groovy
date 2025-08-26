@@ -1,3 +1,4 @@
+// src/org/enbd/common/NexusRest.groovy
 package org.enbd.common
 
 class NexusRest implements Serializable {
@@ -9,10 +10,10 @@ class NexusRest implements Serializable {
 
     def uploadReleaseProdNexus(String version, String repo) {
         steps.echo "🚀 Uploading artifact to Nexus"
-        steps.echo "   → Version: ${version}"
         steps.echo "   → Repository: ${repo}"
+        steps.echo "   → Version: ${version}"
 
-        // Replace this with your actual curl/mvn/gradle upload logic
+        // Example: Simulate Nexus upload (replace with actual Nexus commands)
         steps.sh """
             echo "Simulating upload of version ${version} to Nexus repo ${repo}"
         """
