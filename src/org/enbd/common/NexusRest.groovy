@@ -1,41 +1,20 @@
 package org.enbd.common
 
-// import org.enbd.base.PipelineBase
+class NexusRest implements Serializable {
+    def steps
 
-class NexusRest extends PipelineBase {
-
-    NexusRest(def steps) {
-        super(steps)
+    NexusRest(steps) {
+        this.steps = steps
     }
 
-    def uploadReleaseProdNexus(String pom_location, String repository, Boolean shadowJar_plugin, String version = null) {
-        def pom = this.steps.readMavenPom(file: pom_location)
-        def jar_version = version ?: pom.version
+    def uploadReleaseProdNexus(String version, String repo) {
+        steps.echo "🚀 Uploading artifact to Nexus"
+        steps.echo "   → Version: ${version}"
+        steps.echo "   → Repository: ${repo}"
 
-        def jar_location = shadowJar_plugin ?
-            "build/libs/${pom.artifactId}-${jar_version}-all.jar" :
-            "build/libs/${pom.artifactId}-${jar_version}.jar"
-
-        this.steps.echo("Uploading Jar ${jar_location} to ${repository}")
-
-        this.steps.nexusPublisher(
-            nexusInstanceId: 'nexus-server',
-            nexusRepositoryId: repository,
-            packages: [
-                [
-                    $class: 'MavenPackage',
-                    mavenAssetList: [
-                        [classifier: "", extension: 'jar', filePath: jar_location],
-                        [classifier: "", extension: 'pom', filePath: pom_location]
-                    ],
-                    mavenCoordinate: [
-                        artifactId: pom.artifactId,
-                        groupId: pom.groupId,
-                        packaging: 'jar',
-                        version: jar_version
-                    ]
-                ]
-            ]
-        )
+        // Replace this with your actual curl/mvn/gradle upload logic
+        steps.sh """
+            echo "Simulating upload of version ${version} to Nexus repo ${repo}"
+        """
     }
 }
