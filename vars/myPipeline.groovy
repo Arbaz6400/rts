@@ -1,27 +1,14 @@
-def call(Map params = [:]) {
+def call(Map config = [:]) {
+
     pipeline {
         agent any
 
         environment {
             NEXUS = credentials('nexus-creds')
-            gradle_home = "C:/gradle"
-            nexusRepository = "prod-nexus-repo"
-            engNexusRepository = "eng-nexus-repo"
-            gradle_args = ""
-            gradle_tasks = "clean build publish"
-            skipTagging = false
+            GRADLE_HOME = "C:/gradle" // adjust as needed
         }
 
         stages {
-            stage('Initialize') {
-                steps {
-                    script {
-                        // Set git_repo dynamically inside script
-                        env.git_repo = params.git_repo ?: "https://github.com/Arbaz6400/Streaming.git"
-                    }
-                }
-            }
-
             stage('Perform Gradle Release') {
                 when {
                     not { triggeredBy 'TimerTrigger' }
@@ -29,7 +16,6 @@ def call(Map params = [:]) {
                 }
                 steps {
                     script {
-                        def gradleWrapper = new org.enbd.common.GradleWrapper(steps)
                         withCredentials([
                             usernamePassword(
                                 credentialsId: 'nexus-creds', 
@@ -40,9 +26,9 @@ def call(Map params = [:]) {
                             gradleWrapper.release(
                                 'clean', 
                                 '-Prelease tag', 
-                                "${NEXUS_USERNAME}", 
-                                "${NEXUS_PASSWORD}", 
-                                gradle_home
+                                env.NEXUS_USERNAME, 
+                                env.NEXUS_PASSWORD, 
+                                GRADLE_HOME
                             )
                         }
                     }
@@ -52,10 +38,8 @@ def call(Map params = [:]) {
             stage('Perform Gradle Build') {
                 steps {
                     script {
-                        def gradleWrapper = new org.enbd.common.GradleWrapper(steps)
-                        def shadowJar = true
-                        echo "Gradle tasks: ${gradle_tasks}"
-
+                        shadowJar = true
+                        echo "Gradle tasks: clean build publish"
                         withCredentials([
                             usernamePassword(
                                 credentialsId: 'nexus-creds', 
@@ -64,23 +48,13 @@ def call(Map params = [:]) {
                             )
                         ]) {
                             gradleWrapper.printGitState()
-
-                            def versionOutput = sh(
-                                script: "${gradle_home}/gradle printVersion -q", 
-                                returnStdout: true
-                            ).trim()
-                            echo "Base Version from Gradle: ${versionOutput}"
-
-                            def finalVersion = "${versionOutput}-SNAPSHOT"
-                            echo "Version with Suffix: ${finalVersion}"
-                            env.PROJECT_VERSION = finalVersion
-
-                            gradleWrapper.build(
+                            gradleBuild(
+                                gradleWrapper, 
                                 gradle_args, 
-                                gradle_tasks, 
-                                "${NEXUS_USERNAME}", 
-                                "${NEXUS_PASSWORD}", 
-                                gradle_home
+                                gradle_tasks += 'printVersion', 
+                                env.NEXUS_USERNAME, 
+                                env.NEXUS_PASSWORD, 
+                                GRADLE_HOME
                             )
                         }
                     }
@@ -88,37 +62,45 @@ def call(Map params = [:]) {
             }
 
             stage('Push to Nexus') {
-                when {
-                    not { triggeredBy 'TimerTrigger' }
-                }
                 steps {
                     script {
-                        def gradleWrapper = new org.enbd.common.GradleWrapper(steps)
-                        def nexuskest = new org.enbd.common.NexusRest(steps)
+                        def nexus = new org.enbd.common.NexusRest(this)
 
-                        def branch = env.BRANCH_NAME
-                        def isMaster = (branch == 'master')
+                        // Read POM
                         def pomLocation = 'build/publications/mavenJava/pom-default.xml'
                         def pom = readMavenPom file: pomLocation
-                        def versionToUse = env.PROJECT_VERSION ?: pom.version
-                        def isSnapshot = versionToUse.contains('SNAPSHOT')
-                        def repoType = isSnapshot ? 'snapshot' : 'release'
-                        def nexusRepo = "${nexusRepository}-${repoType}"
-                        def engNexusRepo = "${engNexusRepository}-${repoType}"
-                        def verbose = false
-                        def shadowJar = true
 
+                        // Compute branch-based version
+                        def branch = env.BRANCH_NAME
+                        def version = pom.version
+                        if (branch != 'master') {
+                            version = "${version}-SNAPSHOT"
+                        }
+
+                        // Determine JAR path
+                        def jar_location = shadowJar ?
+                            "build/libs/${pom.artifactId}-${version}-all.jar" :
+                            "build/libs/${pom.artifactId}-${version}.jar"
+
+                        // Determine Nexus repo
+                        def isMaster = (branch == 'master')
+                        def isSnapshot = version.contains('SNAPSHOT')
+                        def repoType = isSnapshot ? 'snapshot' : 'release'
+                        def nexusRepo = "${config.nexusRepository}-${repoType}"
+                        def engNexusRepo = "${config.engNexusRepository}-${repoType}"
+
+                        // Upload
                         if (isMaster && !isSnapshot) {
-                            echo "Uploading to Prod Nexus..."
-                            nexuskest.uploadReleaseProdNexus(pomLocation, nexusRepo, shadowJar)
+                            echo "Uploading to Prod Nexus: ${jar_location}"
+                            nexus.uploadReleaseProdNexus(pomLocation, nexusRepo, shadowJar)
                         } else {
-                            echo "Uploading to Engineering Nexus..."
-                            nexuskest.uploadEngNexusArtifact(
+                            echo "Uploading to Engineering Nexus: ${jar_location}"
+                            nexus.uploadEngNexusArtifact(
                                 pomLocation, 
                                 engNexusRepo, 
                                 shadowJar, 
                                 "${env.NEXUS_USERNAME}:${env.NEXUS_PASSWORD}", 
-                                verbose
+                                false
                             )
                         }
                     }
@@ -129,11 +111,10 @@ def call(Map params = [:]) {
                 when {
                     branch 'master'
                     not { triggeredBy 'TimerTrigger' }
-                    expression { return !skipTagging }
+                    expression { return !config.skipTagging } 
                 }
                 steps {
                     script {
-                        def gradleWrapper = new org.enbd.common.GradleWrapper(steps)
                         withCredentials([
                             usernamePassword(
                                 credentialsId: 'GITBDMPRODUSR', 
@@ -142,7 +123,7 @@ def call(Map params = [:]) {
                             )
                         ]) {
                             gradleWrapper.pushTags(
-                                env.git_repo, 
+                                config.git_repo, 
                                 "${GITHUB_USERNAME}", 
                                 "${GITHUB_PASSWORD}"
                             )
