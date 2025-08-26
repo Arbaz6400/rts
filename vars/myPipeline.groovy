@@ -1,6 +1,3 @@
-// ==========================
-// myPipeline.groovy
-// ==========================
 def call(Map params = [:]) {
     pipeline {
         agent any
@@ -8,7 +5,6 @@ def call(Map params = [:]) {
         environment {
             NEXUS = credentials('nexus-creds')
             gradle_home = "C:/gradle"
-            git_repo = params.git_repo ?: "https://github.com/yourorg/yourrepo.git"
             nexusRepository = "prod-nexus-repo"
             engNexusRepository = "eng-nexus-repo"
             gradle_args = ""
@@ -17,6 +13,15 @@ def call(Map params = [:]) {
         }
 
         stages {
+            stage('Initialize') {
+                steps {
+                    script {
+                        // Set git_repo dynamically inside script
+                        env.git_repo = params.git_repo ?: "https://github.com/Arbaz6400/Streaming.git"
+                    }
+                }
+            }
+
             stage('Perform Gradle Release') {
                 when {
                     not { triggeredBy 'TimerTrigger' }
@@ -137,7 +142,7 @@ def call(Map params = [:]) {
                             )
                         ]) {
                             gradleWrapper.pushTags(
-                                git_repo, 
+                                env.git_repo, 
                                 "${GITHUB_USERNAME}", 
                                 "${GITHUB_PASSWORD}"
                             )
