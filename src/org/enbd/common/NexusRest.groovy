@@ -1,11 +1,11 @@
 package org.enbd.common
 
-class NexusRest {
+import org.enbd.base.PipelineBase
 
-    def steps
+class NexusRest extends PipelineBase {
 
     NexusRest(def steps) {
-        this.steps = steps
+        super(steps)
     }
 
     def uploadReleaseProdNexus(String pom_location, String repository, Boolean shadowJar_plugin, String version = null) {
