@@ -3,16 +3,14 @@ package org.enbd.common
 class GradleWrapper extends CheckmarxBase {
 
     private String gradleBinary
-    private String gradleHome
 
-    GradleWrapper(steps) {
+    GradleWrapper(def steps) {
         super(steps)
-        // Always prefer wrapper – works cross-platform
-        this.gradleBinary = "./gradlew"
+        this.gradleBinary = "gradle7"
     }
 
     private def run(String gradle_args, String gradle_tasks, String username, String password, String gradle_home) {
-        this.steps.sh """
+        steps.sh """
             export GRADLE_USER_HOME=${gradle_home}
             ${this.gradleBinary} -g ${gradle_home} --stacktrace --no-daemon ${gradle_args} ${gradle_tasks} \
                 -PNEXUS_USERNAME=${username} -PNEXUS_PASSWORD=${password}
@@ -31,7 +29,7 @@ class GradleWrapper extends CheckmarxBase {
     }
 
     def pushTags(String git_repo, String username, String password) {
-        this.steps.sh(
+        return this.steps.sh(
             script: "git push https://${username}:${password}@${git_repo} --tags",
             returnStatus: true
         )
