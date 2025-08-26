@@ -1,12 +1,14 @@
-// vars/myPipeline.groovy
-def call() {
+// ==========================
+// myPipeline.groovy
+// ==========================
+def call(Map params = [:]) {
     pipeline {
         agent any
 
         environment {
             NEXUS = credentials('nexus-creds')
             gradle_home = "C:/gradle"
-            git_repo = "https://github.com/yourorg/yourrepo.git"
+            git_repo = params.git_repo ?: "https://github.com/yourorg/yourrepo.git"
             nexusRepository = "prod-nexus-repo"
             engNexusRepository = "eng-nexus-repo"
             gradle_args = ""
@@ -46,7 +48,7 @@ def call() {
                 steps {
                     script {
                         def gradleWrapper = new org.enbd.common.GradleWrapper(steps)
-                        shadowJar = true
+                        def shadowJar = true
                         echo "Gradle tasks: ${gradle_tasks}"
 
                         withCredentials([
@@ -66,7 +68,6 @@ def call() {
 
                             def finalVersion = "${versionOutput}-SNAPSHOT"
                             echo "Version with Suffix: ${finalVersion}"
-
                             env.PROJECT_VERSION = finalVersion
 
                             gradleWrapper.build(
@@ -86,10 +87,9 @@ def call() {
                     not { triggeredBy 'TimerTrigger' }
                 }
                 steps {
-                    unstash 'build'
                     script {
                         def gradleWrapper = new org.enbd.common.GradleWrapper(steps)
-                        def nexusRest = new org.enbd.common.NexusRest(steps)
+                        def nexuskest = new org.enbd.common.NexusRest(steps)
 
                         def branch = env.BRANCH_NAME
                         def isMaster = (branch == 'master')
@@ -101,13 +101,14 @@ def call() {
                         def nexusRepo = "${nexusRepository}-${repoType}"
                         def engNexusRepo = "${engNexusRepository}-${repoType}"
                         def verbose = false
+                        def shadowJar = true
 
                         if (isMaster && !isSnapshot) {
                             echo "Uploading to Prod Nexus..."
-                            nexusRest.uploadReleaseProdNexus(pomLocation, nexusRepo, shadowJar)
+                            nexuskest.uploadReleaseProdNexus(pomLocation, nexusRepo, shadowJar)
                         } else {
                             echo "Uploading to Engineering Nexus..."
-                            nexusRest.uploadEngNexusArtifact(
+                            nexuskest.uploadEngNexusArtifact(
                                 pomLocation, 
                                 engNexusRepo, 
                                 shadowJar, 
