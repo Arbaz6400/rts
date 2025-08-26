@@ -16,11 +16,12 @@ class VersionUtils implements Serializable {
         } else if (steps.fileExists('build.gradle')) {
             steps.echo "🔍 Found build.gradle, parsing version..."
             def gradleFile = steps.readFile('build.gradle')
-            def version = gradleFile.find(/version\s*=\s*['"](.+)['"]/) { full, ver -> ver }
-            if (!version) {
+            def matcher = (gradleFile =~ /version\s*=\s*['"](.+)['"]/)
+            if (matcher) {
+                return matcher[0][1]
+            } else {
                 steps.error "❌ Could not find version in build.gradle"
             }
-            return version
         } else {
             steps.error "❌ No pom.xml or build.gradle found in workspace!"
         }
