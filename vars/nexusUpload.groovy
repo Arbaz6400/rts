@@ -1,6 +1,4 @@
-// vars/nexusUpload.groovy
-def call(String version, String repo) {
-    // Create instance of your Nexus helper
+def call(String pomLocation, String repository, Boolean shadowJar_plugin = true, String version = null) {
     def nexus = new org.enbd.common.NexusRest(this)
-    nexus.uploadReleaseProdNexus(version, repo)
+    nexus.uploadReleaseProdNexus(pomLocation, repository, shadowJar_plugin, version)
 }
