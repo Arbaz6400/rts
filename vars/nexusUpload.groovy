@@ -1,4 +1,4 @@
-def call(String pomLocation, String repository, Boolean shadowJar_plugin = true, String version = null) {
+def call(String version, String repo) {
     def nexus = new org.enbd.common.NexusRest(this)
-    nexus.uploadReleaseProdNexus(pomLocation, repository, shadowJar_plugin, version)
+    nexus.uploadReleaseProdNexus(version, repo)
 }
