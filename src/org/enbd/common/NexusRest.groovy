@@ -1,6 +1,6 @@
 package org.enbd.common
 
-import org.enbd.base.PipelineBase
+// import org.enbd.base.PipelineBase
 
 class NexusRest extends PipelineBase {
 
