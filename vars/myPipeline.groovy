@@ -33,20 +33,34 @@ def call(Map config = [:]) {
         stage('Upload to Nexus') {
             steps {
                 script {
-                    // Define variables
-            def pomLocation = 'build/publications/mavenJava/pom-default.xml'
-            def nexusRepository = 'releases'
-            def shadowJar = false // set to false because your JAR is not -all.jar
+                    // Path to the jar you actually built
+            def jarFile = 'build/libs/streaming-1.0.0.jar'
+            
+            // Verify the jar exists
+            if (!fileExists(jarFile)) {
+                error "Jar file not found: ${jarFile}"
+            } else {
+                echo "Uploading Jar ${jarFile} to Nexus releases"
+            }
 
-            // Initialize NexusRest from library
-            def nexusRest = new org.enbd.common.NexusRest(this)
-
-            // Upload the JAR and POM
-            nexusRest.uploadReleaseProdNexus(pomLocation, nexusRepository, shadowJar
-                                            )
+            // Nexus upload using Nexus Artifact Uploader plugin
+            nexusArtifactUploader artifacts: [[
+                artifactId: 'streaming',
+                classifier: '',
+                file: jarFile,
+                type: 'jar'
+            ]],
+            credentialsId: 'nexus-creds', // your Jenkins credentials ID
+            groupId: 'com.enbd.streaming',
+            nexusUrl: 'https://enqnexus.enbduat.com',
+            nexusVersion: 'nexus3',
+            protocol: 'https',
+            repository: 'releases',
+            version: '1.0.0'
                 }
             }
         }
         }
     }
 }
+
