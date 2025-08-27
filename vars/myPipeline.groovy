@@ -29,14 +29,26 @@ def call(Map config = [:]) {
                 }
             }
 
-            stage('Build & Upload') {
-                steps {
-                    script {
-                        echo "⬆️ Uploading ${env.APP_VERSION} to Nexus..."
-                        // nexusUpload(...)   // your upload logic
-                    }
+            stage('Upload to Nexus') {
+            steps {
+                script {
+                    // Define Nexus-specific variables here
+                    def nexusRepo   = "releases"   // Your Nexus repository ID
+                    def pomFile     = "build/publications/mavenJava/pom-default.xml"
+                    def shadowJar   = true          // true if using Shadow JAR
+
+                    // Create NexusRest instance using the pipeline steps
+                    def nexusRest = new org.enbd.common.NexusRest(this)
+
+                    echo "Uploading Shadow JAR to Nexus..."
+
+                    nexusRest.uploadReleaseProdNexus(
+                        pomFile,
+                        nexusRepo,
+                        shadowJar
+                    )
+
+                    echo "Upload completed."
                 }
             }
-        }
-    }
-}
+            }
