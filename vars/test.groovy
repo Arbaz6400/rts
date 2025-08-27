@@ -19,7 +19,7 @@ def call() {
                 steps {
                     script {
                         // Read original pom.xml
-                        def pomPath = "pom.xml"
+                        def pomPath = "build/publications/mavenJava/pom-default.xml"
                         def pomContent = readFile(pomPath)
 
                         echo "====== Original pom.xml ======"
