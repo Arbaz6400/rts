@@ -33,12 +33,17 @@ def call(Map config = [:]) {
         stage('Upload to Nexus') {
             steps {
                 script {
-                    def nexusRest = new org.enbd.common.NexusRest(this)
-                    nexusRest.uploadReleaseProdNexus(
-                        "build/publications/mavenJava/pom-default.xml",
-                        "releases",
-                        true
-                    )
+                    d// Define variables
+            def pomLocation = 'build/publications/mavenJava/pom-default.xml'
+            def nexusRepository = 'releases'
+            def shadowJar = false // set to false because your JAR is not -all.jar
+
+            // Initialize NexusRest from library
+            def nexusRest = new org.enbd.common.NexusRest(this)
+
+            // Upload the JAR and POM
+            nexusRest.uploadReleaseProdNexus(pomLocation, nexusRepository, shadowJar
+                                            )
                 }
             }
         }
