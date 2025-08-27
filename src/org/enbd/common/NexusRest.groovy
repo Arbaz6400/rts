@@ -1,6 +1,6 @@
 package org.enbd.common
 
-import org.enbd.base.PipelineBase
+import org.enbd.common.PipelineBase
 
 /**
  * This class provides methods for interacting with a Nexus repository.
