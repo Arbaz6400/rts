@@ -2,23 +2,23 @@ package org.enbd.common
 
 import org.enbd.common.PipelineBase
 
+ 
+
 class NexusRest extends PipelineBase {
 
     NexusRest(def steps) {
         super(steps)
     }
 
-    def uploadReleaseProdNexus(String pom_location, String repository, Boolean shadowJar_plugin, String version = null) {
-        def pom = this.steps.readMavenPom(file: pom_location)
-        def jar_version = version ?: pom.version
-
+    def uploadReleaseProdNexus(String pom_location, String repository, Boolean shadowJar_plugin) {
+        def pom = steps.readMavenPom(file: pom_location)
         def jar_location = shadowJar_plugin ?
-            "build/libs/${pom.artifactId}-${jar_version}-all.jar" :
-            "build/libs/${pom.artifactId}-${jar_version}.jar"
+            "build/libs/${pom.artifactId}-${pom.version}-all.jar" :
+            "build/libs/${pom.artifactId}-${pom.version}.jar"
 
-        this.steps.echo("Uploading Jar ${jar_location} to ${repository}")
+        steps.echo("Uploading Jar ${jar_location} to ${repository}")
 
-        this.steps.nexusPublisher(
+        steps.nexusPublisher(
             nexusInstanceId: 'nexus-server',
             nexusRepositoryId: repository,
             packages: [
@@ -32,7 +32,7 @@ class NexusRest extends PipelineBase {
                         artifactId: pom.artifactId,
                         groupId: pom.groupId,
                         packaging: 'jar',
-                        version: jar_version
+                        version: pom.version
                     ]
                 ]
             ]
