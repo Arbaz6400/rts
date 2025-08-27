@@ -2,26 +2,12 @@ package org.enbd.common
 
 import org.enbd.common.PipelineBase
 
-/**
- * This class provides methods for interacting with a Nexus repository.
- * It extends the PipelineBase class and requires a reference to the pipeline steps.
- */
 class NexusRest extends PipelineBase {
 
-    /**
-     * Constructor that takes a reference to the pipeline steps.
-     */
     NexusRest(def steps) {
         super(steps)
     }
 
-    /**
-     * Downloads a JAR file from a Nexus repository.
-     * @param nexusUrl The URL of the Nexus repository.
-     * @param credentialId The ID of the Jenkins credentials to use.
-     * @param jarName The name of the JAR file to download.
-     * @return The HTTP response from the download request.
-     */
     def getJar(String nexusUrl, String credentialId, String jarName) {
         steps.echo("getJar ${nexusUrl}")
         return steps.httpRequest(
@@ -30,13 +16,10 @@ class NexusRest extends PipelineBase {
             consoleLogResponseBody: false,
             outputFile: jarName,
             validResponseCodes: '200',
-            ignoreSslErrors: true,
+            ignoreSslErrors: true
         )
     }
 
-    /**
-     * Get a list of repositories from a Nexus server.
-     */
     def getRepositories(String nexusUrl, String username, String password) {
         return """#!/bin/bash -x
         curl -u ${username}:${password} -X GET ${nexusUrl}/service/rest/v1/repositories
@@ -48,9 +31,6 @@ class NexusRest extends PipelineBase {
         return this.steps.readJSON(text: response)
     }
 
-    /**
-     * Uploads a release to a production Nexus repository using nexusArtifactUploader.
-     */
     def uploadReleaseProdNexus(String pom_location, String repository, Boolean shadowJar_plugin) {
         def pom = this.steps.readMavenPom(file: pom_location)
         def jar_location = shadowJar_plugin ?
@@ -66,7 +46,7 @@ class NexusRest extends PipelineBase {
             groupId: pom.groupId,
             version: pom.version,
             repository: repository,
-            credentialsId: 'nexus-credentials', // replace with your Jenkins credentials ID
+            credentialsId: 'nexus-creds',  // <-- your Jenkins credential ID
             artifacts: [
                 [artifactId: pom.artifactId, classifier: '', file: jar_location, type: 'jar'],
                 [artifactId: pom.artifactId, classifier: '', file: pom_location, type: 'pom']
@@ -74,9 +54,6 @@ class NexusRest extends PipelineBase {
         )
     }
 
-    /**
-     * Uploads a release to an engineering Nexus repository.
-     */
     def uploadReleaseEngNexus(String pom_location, String repository, Boolean shadowJar_plugin) {
         def pom = this.steps.readMavenPom(file: pom_location)
         def jar_location = shadowJar_plugin ?
@@ -92,7 +69,7 @@ class NexusRest extends PipelineBase {
             groupId: pom.groupId,
             version: pom.version,
             repository: repository,
-            credentialsId: 'nexus-credentials', // replace with your Jenkins credentials ID
+            credentialsId: 'nexus-creds',
             artifacts: [
                 [artifactId: pom.artifactId, classifier: '', file: jar_location, type: 'jar'],
                 [artifactId: pom.artifactId, classifier: '', file: pom_location, type: 'pom']
@@ -100,9 +77,6 @@ class NexusRest extends PipelineBase {
         )
     }
 
-    /**
-     * Uploads an artifact to an engineering Nexus repository using curl.
-     */
     def uploadEngNexusArtifact(String pom_location, String repository,
                                Boolean shadowJar_plugin, String userpass, boolean verbose) {
         def pom = this.steps.readMavenPom(file: pom_location)
@@ -140,17 +114,11 @@ class NexusRest extends PipelineBase {
         def verbose = args.get('verbose', false) ? "-v" : ""
         def url = args['url']
         def authentication = args.get('authentication', '')
-        def form_content = args.get('form_content', [])
         def uploadFile = args.get('uploadFile', '')
-
-        def form_content_str = ""
-        form_content.each {
-            form_content_str += "-F '${it}' "
-        }
 
         def uploadFileStr = uploadFile ? "--upload-file ${uploadFile}" : ""
 
-        def curl_command = "curl -o /dev/null -w '%{http_code}' ${verbose} ${ignoreSslErrors} -X ${httpMode} ${form_content_str} ${uploadFileStr} ${url}"
+        def curl_command = "curl -o /dev/null -w '%{http_code}' ${verbose} ${ignoreSslErrors} -X ${httpMode} ${uploadFileStr} ${url}"
 
         def curl_result = this.steps.sh(
             script: "${curl_command} -u '${authentication}'",
