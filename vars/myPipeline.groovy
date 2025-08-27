@@ -33,7 +33,7 @@ def call(Map config = [:]) {
         stage('Upload to Nexus') {
             steps {
                 script {
-                    d// Define variables
+                    // Define variables
             def pomLocation = 'build/publications/mavenJava/pom-default.xml'
             def nexusRepository = 'releases'
             def shadowJar = false // set to false because your JAR is not -all.jar
