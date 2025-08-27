@@ -29,7 +29,7 @@ def call(Map config = [:]) {
                 }
             }
 
-            stages {
+
         stage('Upload to Nexus') {
             steps {
                 script {
@@ -42,7 +42,6 @@ def call(Map config = [:]) {
                 }
             }
         }
-    }
-}
+        }
     }
 }
