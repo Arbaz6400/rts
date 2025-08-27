@@ -29,25 +29,27 @@ def call(Map config = [:]) {
                 }
             }
 stage('Debug: Find Matchers in Pipeline State') {
-    steps.echo "🔎 Scanning pipeline globals for java.util.regex.Matcher..."
+    steps {
+        script {
+            echo "🔎 Scanning pipeline globals for java.util.regex.Matcher..."
 
-    // Scan the binding (the global vars/closures Jenkins has captured)
-    def badVars = []
-    this.binding.variables.each { k, v ->
-        if (v instanceof java.util.regex.Matcher) {
-            badVars << "${k} => ${v}"
+            def badVars = []
+            binding.variables.each { k, v ->
+                if (v instanceof java.util.regex.Matcher) {
+                    badVars << "${k} => ${v}"
+                }
+            }
+
+            if (badVars) {
+                echo "❌ Found non-serializable Matchers in pipeline state:"
+                badVars.each { echo "   " + it }
+                error("Pipeline is holding java.util.regex.Matcher objects, which will break serialization!")
+            } else {
+                echo "✅ No Matcher objects found in pipeline state."
+            }
         }
     }
-
-    if (badVars) {
-        steps.echo "❌ Found non-serializable Matchers in pipeline state:"
-        badVars.each { steps.echo "   " + it }
-        steps.error("Pipeline is holding java.util.regex.Matcher objects, which will break serialization!")
-    } else {
-        steps.echo "✅ No Matcher objects found in pipeline state."
-    }
 }
-
 
         stage('Upload to Nexus') {
             steps {
