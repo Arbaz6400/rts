@@ -1,13 +1,10 @@
 package org.enbd.common
 
+
 class PipelineBase implements Serializable {
     def steps
 
-    PipelineBase(steps) {
+    PipelineBase(def steps) {
         this.steps = steps
-    }
-
-    void log(String message) {
-        steps.echo "[PipelineBase] ${message}"
     }
 }
