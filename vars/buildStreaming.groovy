@@ -12,12 +12,21 @@ def call() {
             stage('Build') {
                 steps {
                     script {
-                        // Compute version inside script block
-                        def appVersion = getVersionForBranch(env.BRANCH_NAME)
-                        env.APP_VERSION = appVersion
-                        echo "Building streaming JAR with version: ${env.APP_VERSION}"
+                        // Helper defined here
+                        def getVersionForBranch = { branch ->
+                            if (branch == 'master') {
+                                return "1.0.0"
+                            } else if (branch.startsWith('release/')) {
+                                return branch.replace('release/', '') + "-RC"
+                            } else {
+                                return "1.0.0-${branch}"
+                            }
+                        }
 
-                        // Run Gradle shadowJar with version
+                        env.APP_VERSION = getVersionForBranch(env.BRANCH_NAME)
+                        echo "Using version: ${env.APP_VERSION}"
+
+                        // Gradle build
                         sh "./gradlew clean shadowJar -PappVersion=${env.APP_VERSION}"
                     }
                 }
@@ -42,16 +51,5 @@ def call() {
             success { echo "Build and upload completed successfully." }
             failure { echo "Build or upload failed." }
         }
-    }
-}
-
-// Closure to compute version
-def getVersionForBranch = { branch ->
-    if (branch == 'master') {
-        return "1.0.0"
-    } else if (branch.startsWith('release/')) {
-        return branch.replace('release/', '') + "-RC"
-    } else {
-        return "1.0.0-${branch}"
     }
 }
