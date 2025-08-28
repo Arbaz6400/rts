@@ -1,32 +1,17 @@
-def call(String branchName = env.BRANCH_NAME) {
+def call(Map config = [:]) {
+    // Optional config
+    def APP_VERSION = config.get('appVersion', '1.0.0')
+
     pipeline {
         agent any
-
         environment {
-            APP_VERSION = ''
+            APP_VERSION = "${APP_VERSION}"
         }
 
         stages {
-            stage('Prepare') {
-                steps {
-                    script {
-                        // Determine app version based on branch
-                        APP_VERSION = getVersionForBranch(branchName ?: 'main')
-                        echo "Using version: ${APP_VERSION}"
-                    }
-                }
-            }
-
             stage('Checkout') {
                 steps {
-                    checkout([
-                        $class: 'GitSCM',
-                        branches: [[name: "*/${branchName ?: 'main'}"]],
-                        userRemoteConfigs: [[
-                            url: 'https://github.com/Arbaz6400/Streaming.git',
-                            credentialsId: 'b53cd150-f2f4-404d-9ea6-92bcab9138b9'
-                        ]]
-                    ])
+                    checkout scm
                 }
             }
 
@@ -35,39 +20,31 @@ def call(String branchName = env.BRANCH_NAME) {
                     script {
                         if (isUnix()) {
                             sh "./gradlew clean shadowJar -PappVersion=${APP_VERSION}"
+                            def jarFile = sh(script: "ls build/libs/*-all.jar", returnStdout: true).trim()
+                            echo "Generated JAR: ${jarFile}"
                         } else {
                             bat "gradlew.bat clean shadowJar -PappVersion=${APP_VERSION}"
+                            def jarFile = bat(script: "dir /b build\\libs\\*-all.jar", returnStdout: true).trim()
+                            echo "Generated JAR: ${jarFile}"
                         }
                     }
                 }
             }
 
             stage('Upload') {
+                when {
+                    expression { false } // Skip actual upload
+                }
                 steps {
-                    echo "Upload stage skipped (configure Nexus if needed)"
-                    // Optional: uncomment Nexus upload steps if required
+                    echo "Skipping upload"
                 }
             }
         }
 
         post {
-            success {
-                echo "Build succeeded with version ${APP_VERSION}"
-            }
-            failure {
-                echo "Build failed"
+            always {
+                echo "Build finished for version: ${APP_VERSION}"
             }
         }
-    }
-}
-
-// Helper function
-def getVersionForBranch(branchName) {
-    if (branchName == 'main') {
-        return "1.0.0-main"
-    } else if (branchName == 'develop') {
-        return "1.0.0-dev"
-    } else {
-        return "1.0.0-${branchName}"
     }
 }
