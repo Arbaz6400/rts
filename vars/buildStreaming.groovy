@@ -1,55 +1,73 @@
-def call() {
+def call(String branchName = env.BRANCH_NAME) {
     pipeline {
         agent any
 
+        environment {
+            APP_VERSION = ''
+        }
+
         stages {
+            stage('Prepare') {
+                steps {
+                    script {
+                        // Determine app version based on branch
+                        APP_VERSION = getVersionForBranch(branchName ?: 'main')
+                        echo "Using version: ${APP_VERSION}"
+                    }
+                }
+            }
+
             stage('Checkout') {
                 steps {
-                    checkout scm
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: "*/${branchName ?: 'main'}"]],
+                        userRemoteConfigs: [[
+                            url: 'https://github.com/Arbaz6400/Streaming.git',
+                            credentialsId: 'b53cd150-f2f4-404d-9ea6-92bcab9138b9'
+                        ]]
+                    ])
                 }
             }
 
             stage('Build') {
                 steps {
                     script {
-                        // Helper defined here
-                        def getVersionForBranch = { branch ->
-                            if (branch == 'master') {
-                                return "1.0.0"
-                            } else if (branch.startsWith('release/')) {
-                                return branch.replace('release/', '') + "-RC"
-                            } else {
-                                return "1.0.0-${branch}"
-                            }
+                        if (isUnix()) {
+                            sh "./gradlew clean shadowJar -PappVersion=${APP_VERSION}"
+                        } else {
+                            bat "gradlew.bat clean shadowJar -PappVersion=${APP_VERSION}"
                         }
-
-                        env.APP_VERSION = getVersionForBranch(env.BRANCH_NAME)
-                        echo "Using version: ${env.APP_VERSION}"
-
-                        // Gradle build
-                        sh "./gradlew clean shadowJar -PappVersion=${env.APP_VERSION}"
                     }
                 }
             }
 
             stage('Upload') {
                 steps {
-                    script {
-                        def jarName = "streaming-${env.APP_VERSION}-all.jar"
-                        echo "Uploading JAR: ${jarName}"
-                        sh """
-                        curl -u $NEXUS_USERNAME:$NEXUS_PASSWORD \
-                        -T build/libs/${jarName} \
-                        https://nexus.example.com/repository/releases/
-                        """
-                    }
+                    echo "Upload stage skipped (configure Nexus if needed)"
+                    // Optional: uncomment Nexus upload steps if required
                 }
             }
         }
 
         post {
-            success { echo "Build and upload completed successfully." }
-            failure { echo "Build or upload failed." }
+            success {
+                echo "Build succeeded with version ${APP_VERSION}"
+            }
+            failure {
+                echo "Build failed"
+            }
         }
+    }
+}
+
+// Helper function
+def getVersionForBranch(branchName) {
+    if (branchName == 'main') {
+        return "1.0.0-main"
+    } else if (branchName == 'develop') {
+        return "1.0.0-dev"
+    } else {
+        return "1.0.0-${branchName}"
     }
 }
