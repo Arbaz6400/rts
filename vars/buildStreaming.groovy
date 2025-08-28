@@ -1,46 +1,46 @@
-// vars/buildStreaming.groovy
-def call(String branchName, String gradleHome, String nexusUsername, String nexusPassword) {
+def call(Map params = [:]) {
     pipeline {
         agent any
 
         environment {
-            NEXUS_USERNAME = nexusUsername
-            NEXUS_PASSWORD = nexusPassword
+            GRADLE_HOME = "/home/nonroot/.gradle7"
+            NEXUS_USERNAME = credentials('rts-nexus-username')
+            NEXUS_PASSWORD = credentials('rts-nexus-password')
         }
 
         stages {
-            stage('Determine Version') {
+            stage('Calculate Version') {
                 steps {
                     script {
-                        // Branch-based versioning
-                        def APP_VERSION
-                        if (branchName == 'master') {
-                            APP_VERSION = "1.1.0"
-                        } else if (branchName.startsWith('release')) {
-                            APP_VERSION = "1.1.0-RC"
-                        } else {
-                            APP_VERSION = "1.1.0-SNAPSHOT"
-                        }
-                        echo "Dynamic APP_VERSION = ${APP_VERSION}"
-                        env.APP_VERSION = APP_VERSION
+                        // Dynamic version based on branch
+                        def branchName = env.BRANCH_NAME ?: 'main'
+                        def baseVersion = "1.0.0"
+                        env.APP_VERSION = branchName == 'master' ? baseVersion : "${baseVersion}-${branchName}"
+                        echo "Calculated APP_VERSION: ${env.APP_VERSION}"
                     }
                 }
             }
 
-            stage('Build Streaming Repo') {
+            stage('Build & Publish') {
                 steps {
                     script {
-                        def gradle = new org.enbd.common.GradleWrapper(steps)
-                        gradle.build(
-                            gradleArgs: "clean build shadowJar",
-                            gradleTasks: "",
-                            username: env.NEXUS_USERNAME,
-                            password: env.NEXUS_PASSWORD,
-                            gradleHome: gradleHome,
+                        // Call the buildStreaming function from Streaming repo
+                        buildStreaming(
+                            gradleArgs: "clean build install dependencies",
+                            gradleTasks: "shadowJar",
+                            gradleHome: env.GRADLE_HOME,
+                            nexusUsername: env.NEXUS_USERNAME,
+                            nexusPassword: env.NEXUS_PASSWORD,
                             appVersion: env.APP_VERSION
                         )
                     }
                 }
+            }
+        }
+
+        post {
+            always {
+                echo "Pipeline finished. APP_VERSION was ${env.APP_VERSION}"
             }
         }
     }
