@@ -4,16 +4,14 @@ import java.io.Serializable
 
 class VersionUtils implements Serializable {
     def steps
-    def gradleDir = '.'  // default folder, can point to Streaming repo if needed
+    def gradleDir
 
     VersionUtils(steps, gradleDir = '.') {
         this.steps = steps
         this.gradleDir = gradleDir
     }
 
-    /**
-     * Reads the default appVersion from build.gradle safely
-     */
+    // Read appVersion from build.gradle
     String getDefaultVersion() {
         def gradleFile = "${gradleDir}/build.gradle"
         if (!steps.fileExists(gradleFile)) {
@@ -23,33 +21,26 @@ class VersionUtils implements Serializable {
 
         steps.echo "🔍 Reading default version from ${gradleFile}..."
         def content = steps.readFile(gradleFile)
-        def lines = content.split('\n')
-
-        for (line in lines) {
+        content.split('\n').each { line ->
             line = line.trim()
             if (line.startsWith('def appVersion') && line.contains('?:')) {
                 def parts = line.split('\\?:', 2)
                 if (parts.length == 2) {
                     def versionPart = parts[1].trim()
-                    // remove quotes safely
                     if ((versionPart.startsWith('"') && versionPart.endsWith('"')) ||
                         (versionPart.startsWith("'") && versionPart.endsWith("'"))) {
-                        versionPart = versionPart.substring(1, versionPart.length() - 1)
+                        versionPart = versionPart[1..-2] // remove quotes
                     }
                     return versionPart
                 }
             }
         }
 
-        steps.echo "⚠️ Could not find appVersion default, returning fallback"
+        steps.echo "⚠️ Could not find appVersion, returning fallback"
         return '0.0.1'
     }
 
-    /**
-     * Returns final version based on branch
-     * Only develop = -SNAPSHOT, main = base version
-     * Any other branch throws exception
-     */
+    // Return version based on branch
     String getVersionForBranch(String branchName) {
         def baseVersion = getDefaultVersion()
 
