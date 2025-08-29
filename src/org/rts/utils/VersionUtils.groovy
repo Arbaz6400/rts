@@ -50,16 +50,5 @@ class VersionUtils implements Serializable {
                 throw new IllegalArgumentException("Branch ${branchName} not supported for versioning")
         }
     }
-}
 
-    String getVersionForBranch(String branchName) {
-        def baseVersion = getDefaultVersion()
-        if ("develop".equals(branchName)) {
-            return baseVersion + "-SNAPSHOT"
-        } else if ("main".equals(branchName)) {
-            return baseVersion
-        } else {
-            steps.error "❌ Branch '${branchName}' is not allowed for versioning."
-        }
-    }
 }
