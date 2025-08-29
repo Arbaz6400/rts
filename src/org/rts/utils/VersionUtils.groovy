@@ -18,10 +18,16 @@ class VersionUtils implements Serializable {
         if (steps.fileExists('build.gradle')) {
             steps.echo "🔍 Reading default version from build.gradle..."
             def content = steps.readFile('build.gradle')
-
-            def matcher = content =~ /def\s+appVersion\s*=\s*project\.findProperty\('appVersion'\)\s*\?:\s*['"](.+?)['"]/
-            if (matcher) {
-                return matcher[0][1]
+            
+            // Simple split-based approach instead of regex/matcher
+            content.eachLine { line ->
+                line = line.trim()
+                if (line.startsWith("def appVersion")) {
+                    def parts = line.split("\\?:")
+                    if (parts.size() > 1) {
+                        return parts[1].trim().replaceAll("['\"]", "")
+                    }
+                }
             }
         }
         return '0.0.1'
@@ -30,20 +36,18 @@ class VersionUtils implements Serializable {
     /**
      * Computes final version based on branch
      * develop -> -SNAPSHOT
-     * release -> -RC
-     * main/stg -> base version
+     * main -> base version
+     * other branches -> throw error
      */
     String getVersionForBranch(String branchName) {
         def baseVersion = getDefaultVersion()
-        def finalVersion = baseVersion
 
         if (branchName == 'develop') {
-            finalVersion += '-SNAPSHOT'
-        } else if (branchName == 'release') {
-            finalVersion += '-RC'
+            return baseVersion + '-SNAPSHOT'
+        } else if (branchName == 'main') {
+            return baseVersion
+        } else {
+            steps.error("❌ Branch '${branchName}' is not supported for versioning.")
         }
-        // main/stg -> leave as baseVersion
-
-        return finalVersion
     }
 }
