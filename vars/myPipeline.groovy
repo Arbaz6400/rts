@@ -7,16 +7,16 @@ def call(Map config = [:]) {
         stages {
            stage('Versioning') {
     steps {
-        // Switch to the root of the Streaming repo
-        dir("${env.WORKSPACE}/Streaming") {
-            script {
-                def versionUtils = new org.rts.utils.VersionUtils(this, '.')
-                env.APP_VERSION = versionUtils.getVersionForBranch(env.BRANCH_NAME)
-                echo "📌 Final version: ${env.APP_VERSION}"
-            }
+        script {
+            def versionUtils = new org.rts.utils.VersionUtils(this)
+            def finalVersion = versionUtils.getVersionForBranch(env.BRANCH_NAME)
+
+            env.APP_VERSION = finalVersion
+            echo "📌 Final version: ${env.APP_VERSION}"
         }
     }
 }
+
 
 
 
