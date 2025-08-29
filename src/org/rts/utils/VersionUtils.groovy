@@ -9,21 +9,6 @@ class VersionUtils implements Serializable {
         this.steps = steps
     }
 
-    package org.rts.utils
-
-import java.io.Serializable
-
-class VersionUtils implements Serializable {
-    def steps
-
-    VersionUtils(steps) {
-        this.steps = steps
-    }
-
-    /**
-     * Reads default appVersion from build.gradle
-     * CPS-safe, scans 'def appVersion' line and extracts fallback version
-     */
     String getDefaultVersion() {
         if (!steps.fileExists('build.gradle')) {
             steps.echo "⚠️ build.gradle not found, using fallback version 0.0.1"
