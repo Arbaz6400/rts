@@ -10,9 +10,8 @@ class VersionUtils implements Serializable {
     }
 
     /**
-     * Reads the default appVersion from build.gradle in a CPS-safe way.
-     * Looks for: def appVersion = project.findProperty('appVersion') ?: '1.0.1'
-     * Returns the default value (e.g., '1.0.1') or '0.0.1' if not found
+     * Reads the default appVersion from build.gradle without using regex.
+     * Expects a line like: def appVersion = project.findProperty('appVersion') ?: '1.0.1'
      */
     String getDefaultVersion() {
         if (steps.fileExists('build.gradle')) {
@@ -22,10 +21,14 @@ class VersionUtils implements Serializable {
 
             for (line in lines) {
                 line = line.trim()
-                // CPS-safe regex match
-                def matcher = line =~ /def\s+appVersion\s*=\s*project\.findProperty\('appVersion'\)\s*\?:\s*['"](.+?)['"]/
-                if (matcher) {
-                    return matcher[0][1]
+                if (line.startsWith("def appVersion")) {
+                    def parts = line.split("\\?:")
+                    if (parts.size() == 2) {
+                        def versionPart = parts[1].trim()
+                        // remove quotes
+                        versionPart = versionPart.replaceAll(/^['"]|['"]$/, '')
+                        return versionPart
+                    }
                 }
             }
         }
