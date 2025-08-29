@@ -15,15 +15,16 @@ class VersionUtils implements Serializable {
         def content = steps.readFile('build.gradle')
         def line = content.readLines().find { it.contains("def appVersion") }
         if (line) {
-            // line should look like: def appVersion = project.findProperty('appVersion') ?: '1.0.1'
-            def parts = line.split(":\\s*\\'|\\\"")  // split by ' or "
-            if (parts.length >= 2) {
-                return parts[1]
+            // Extract version between quotes
+            def matcher = line =~ /['"](.+?)['"]/
+            if (matcher) {
+                return matcher[0][1]  // Just the version without quotes
             }
         }
     }
     return '0.0.1'
 }
+
     String getVersionForBranch(String branchName) {
         def baseVersion = getDefaultVersion()
         if ("develop".equals(branchName)) {
