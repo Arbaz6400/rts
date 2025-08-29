@@ -10,30 +10,20 @@ class VersionUtils implements Serializable {
     }
 
     String getDefaultVersion() {
-        if (steps.fileExists('build.gradle')) {
-            steps.echo "🔍 Reading default version from build.gradle..."
-            def content = steps.readFile('build.gradle')
-            def lines = content.split('\n')
-            for (def line : lines) {
-                line = line.trim()
-                if (line.startsWith("def appVersion")) {
-                    def idx = line.indexOf("?:")
-                    if (idx >= 0) {
-                        def versionPart = line.substring(idx + 2).trim()
-                        // CPS-safe quote removal
-                        if ((versionPart.length() > 1) &&
-                            ((versionPart[0] == "'" && versionPart[-1] == "'") ||
-                             (versionPart[0] == '"' && versionPart[-1] == '"'))) {
-                            versionPart = versionPart.substring(1, versionPart.length() - 1)
-                        }
-                        return versionPart
-                    }
-                }
+    if (steps.fileExists('build.gradle')) {
+        steps.echo "🔍 Reading default version from build.gradle..."
+        def content = steps.readFile('build.gradle')
+        def line = content.readLines().find { it.contains("def appVersion") }
+        if (line) {
+            // line should look like: def appVersion = project.findProperty('appVersion') ?: '1.0.1'
+            def parts = line.split(":\\s*\\'|\\\"")  // split by ' or "
+            if (parts.length >= 2) {
+                return parts[1]
             }
         }
-        return '0.0.1'
     }
-
+    return '0.0.1'
+}
     String getVersionForBranch(String branchName) {
         def baseVersion = getDefaultVersion()
         if ("develop".equals(branchName)) {
