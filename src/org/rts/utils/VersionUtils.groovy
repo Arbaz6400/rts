@@ -10,7 +10,7 @@ class VersionUtils implements Serializable {
     }
 
     /**
-     * Reads the default appVersion from build.gradle
+     * Reads the default appVersion from build.gradle in a CPS-safe way.
      * Looks for: def appVersion = project.findProperty('appVersion') ?: '1.0.1'
      * Returns the default value (e.g., '1.0.1') or '0.0.1' if not found
      */
@@ -18,15 +18,14 @@ class VersionUtils implements Serializable {
         if (steps.fileExists('build.gradle')) {
             steps.echo "🔍 Reading default version from build.gradle..."
             def content = steps.readFile('build.gradle')
-            
-            // Simple split-based approach instead of regex/matcher
-            content.eachLine { line ->
+            def lines = content.split('\n')
+
+            for (line in lines) {
                 line = line.trim()
-                if (line.startsWith("def appVersion")) {
-                    def parts = line.split("\\?:")
-                    if (parts.size() > 1) {
-                        return parts[1].trim().replaceAll("['\"]", "")
-                    }
+                // CPS-safe regex match
+                def matcher = line =~ /def\s+appVersion\s*=\s*project\.findProperty\('appVersion'\)\s*\?:\s*['"](.+?)['"]/
+                if (matcher) {
+                    return matcher[0][1]
                 }
             }
         }
@@ -37,17 +36,16 @@ class VersionUtils implements Serializable {
      * Computes final version based on branch
      * develop -> -SNAPSHOT
      * main -> base version
-     * other branches -> throw error
+     * any other branch -> throw error
      */
     String getVersionForBranch(String branchName) {
         def baseVersion = getDefaultVersion()
-
         if (branchName == 'develop') {
             return baseVersion + '-SNAPSHOT'
         } else if (branchName == 'main') {
             return baseVersion
         } else {
-            steps.error("❌ Branch '${branchName}' is not supported for versioning.")
+            steps.error "❌ Branch '${branchName}' is not allowed for versioning."
         }
     }
 }
