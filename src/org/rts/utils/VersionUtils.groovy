@@ -4,52 +4,46 @@ import java.io.Serializable
 
 class VersionUtils implements Serializable {
     def steps
-    def gradleDir
 
-    VersionUtils(steps, gradleDir = '.') {
+    VersionUtils(steps) {
         this.steps = steps
-        this.gradleDir = gradleDir
     }
 
-    // Read appVersion from build.gradle
+    /**
+     * Reads the default appVersion from build.gradle
+     * Looks for: def appVersion = project.findProperty('appVersion') ?: '1.0.1'
+     * Returns the default value (e.g., '1.0.1') or '0.0.1' if not found
+     */
     String getDefaultVersion() {
-        def gradleFile = "${gradleDir}/build.gradle"
-        if (!steps.fileExists(gradleFile)) {
-            steps.echo "⚠️ build.gradle not found at ${gradleFile}"
-            return '0.0.1'
-        }
+        if (steps.fileExists('build.gradle')) {
+            steps.echo "🔍 Reading default version from build.gradle..."
+            def content = steps.readFile('build.gradle')
 
-        steps.echo "🔍 Reading default version from ${gradleFile}..."
-        def content = steps.readFile(gradleFile)
-        content.split('\n').each { line ->
-            line = line.trim()
-            if (line.startsWith('def appVersion') && line.contains('?:')) {
-                def parts = line.split('\\?:', 2)
-                if (parts.length == 2) {
-                    def versionPart = parts[1].trim()
-                    if ((versionPart.startsWith('"') && versionPart.endsWith('"')) ||
-                        (versionPart.startsWith("'") && versionPart.endsWith("'"))) {
-                        versionPart = versionPart[1..-2] // remove quotes
-                    }
-                    return versionPart
-                }
+            def matcher = content =~ /def\s+appVersion\s*=\s*project\.findProperty\('appVersion'\)\s*\?:\s*['"](.+?)['"]/
+            if (matcher) {
+                return matcher[0][1]
             }
         }
-
-        steps.echo "⚠️ Could not find appVersion, returning fallback"
         return '0.0.1'
     }
 
-    // Return version based on branch
+    /**
+     * Computes final version based on branch
+     * develop -> -SNAPSHOT
+     * release -> -RC
+     * main/stg -> base version
+     */
     String getVersionForBranch(String branchName) {
         def baseVersion = getDefaultVersion()
+        def finalVersion = baseVersion
 
         if (branchName == 'develop') {
-            return "${baseVersion}-SNAPSHOT"
-        } else if (branchName == 'main') {
-            return baseVersion
-        } else {
-            throw new IllegalArgumentException("❌ Unsupported branch '${branchName}'. Only 'develop' and 'main' are allowed.")
+            finalVersion += '-SNAPSHOT'
+        } else if (branchName == 'release') {
+            finalVersion += '-RC'
         }
+        // main/stg -> leave as baseVersion
+
+        return finalVersion
     }
 }
