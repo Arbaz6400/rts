@@ -8,10 +8,8 @@ def call(Map config = [:]) {
             stage('Versioning') {
     steps {
         script {
-            def versionUtils = new org.rts.utils.VersionUtils(this)
-            def finalVersion = versionUtils.getVersionForBranch(env.BRANCH_NAME)
-
-            env.APP_VERSION = finalVersion
+            def versionUtils = new org.rts.utils.VersionUtils(this, '../Streaming')
+            env.APP_VERSION = versionUtils.getVersionForBranch(env.BRANCH_NAME)
             echo "📌 Final version: ${env.APP_VERSION}"
         }
     }
