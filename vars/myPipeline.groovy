@@ -5,7 +5,7 @@ def call(Map config = [:]) {
         agent any
 
         stages {
-            sstage('Versioning') {
+            stage('Versioning') {
     steps {
         script {
             // Make sure gradleDir points to the correct Streaming folder
