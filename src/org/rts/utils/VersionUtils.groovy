@@ -13,12 +13,13 @@ class VersionUtils implements Serializable {
     if (steps.fileExists('build.gradle')) {
         steps.echo "🔍 Reading default version from build.gradle..."
         def content = steps.readFile('build.gradle')
-        def line = content.readLines().find { it.contains("def appVersion") }
-        if (line) {
-            // Extract version between quotes
-            def matcher = line =~ /['"](.+?)['"]/
-            if (matcher) {
-                return matcher[0][1]  // Just the version without quotes
+        def versionLine = content.readLines().find { it.contains("def appVersion") }
+
+        if (versionLine) {
+            // Split on '=' and remove quotes & spaces
+            def parts = versionLine.split("=")
+            if (parts.length == 2) {
+                return parts[1].trim().replaceAll("['\"]", "")
             }
         }
     }
