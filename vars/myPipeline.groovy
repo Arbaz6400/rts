@@ -5,16 +5,19 @@ def call(Map config = [:]) {
         agent any
 
         stages {
-            stage('Versioning') {
+           stage('Versioning') {
     steps {
-        script {
-            // Make sure gradleDir points to the correct Streaming folder
-            def versionUtils = new org.rts.utils.VersionUtils(this, 'Streaming')
-            env.APP_VERSION = versionUtils.getVersionForBranch(env.BRANCH_NAME)
-            echo "📌 Final version: ${env.APP_VERSION}"
+        // Switch to the root of the Streaming repo
+        dir("${env.WORKSPACE}/Streaming") {
+            script {
+                def versionUtils = new org.rts.utils.VersionUtils(this, '.')
+                env.APP_VERSION = versionUtils.getVersionForBranch(env.BRANCH_NAME)
+                echo "📌 Final version: ${env.APP_VERSION}"
+            }
         }
     }
 }
+
 
 
 stage('Debug: Find Matchers in Pipeline State') {
