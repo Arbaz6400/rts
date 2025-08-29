@@ -30,13 +30,6 @@ class VersionUtils implements Serializable {
         return '0.0.1'
     }
 
-    /**
-     * Computes final version based on branch
-     * develop -> -SNAPSHOT
-     * release -> -RC
-     * main -> base version
-     * Other branches -> error
-     */
     String getVersionForBranch(String branchName) {
         def baseVersion = getDefaultVersion()
         switch(branchName) {
