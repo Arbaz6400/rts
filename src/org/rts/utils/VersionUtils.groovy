@@ -11,12 +11,14 @@ class VersionUtils implements Serializable {
 
     /**
      * Reads default appVersion from build.gradle without regex or split.
+     * CPS-safe version.
      */
     String getDefaultVersion() {
         if (steps.fileExists('build.gradle')) {
             steps.echo "🔍 Reading default version from build.gradle..."
             def content = steps.readFile('build.gradle')
-            content.eachLine { line ->
+            def lines = content.split('\n') // CPS-safe
+            for (line in lines) {
                 line = line.trim()
                 if (line.startsWith("def appVersion")) {
                     def idx = line.indexOf("?:")
