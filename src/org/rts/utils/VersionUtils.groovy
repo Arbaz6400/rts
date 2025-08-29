@@ -15,34 +15,35 @@ class VersionUtils implements Serializable {
      * Reads the default appVersion from build.gradle robustly
      */
     String getDefaultVersion() {
-        // Find build.gradle in the specified dir
-        def gradleFile = "${gradleDir}/build.gradle"
-        if (!steps.fileExists(gradleFile)) {
-            steps.echo "⚠️ build.gradle not found at ${gradleFile}"
-            return '0.0.1'
-        }
-
-        steps.echo "🔍 Reading default version from ${gradleFile}..."
-        def content = steps.readFile(gradleFile)
-        def lines = content.split('\n')
-
-        for (line in lines) {
-            line = line.trim()
-            // Look for the default appVersion line
-            if (line.startsWith('def appVersion') && line.contains('?:')) {
-                def parts = line.split('\\?:', 2)  // split into 2 parts max
-                if (parts.length == 2) {
-                    def versionPart = parts[1].trim()
-                    // Remove quotes and possible trailing comments
-                    versionPart = versionPart.replaceAll(/['"].*?['"]/, { m -> m[0][1..-2] })
-                    return versionPart
-                }
-            }
-        }
-
-        steps.echo "⚠️ Could not find appVersion default, returning fallback"
+    def gradleFile = "${gradleDir}/build.gradle"
+    if (!steps.fileExists(gradleFile)) {
+        steps.echo "⚠️ build.gradle not found at ${gradleFile}"
         return '0.0.1'
     }
+
+    steps.echo "🔍 Reading default version from ${gradleFile}..."
+    def content = steps.readFile(gradleFile)
+    def lines = content.split('\n')
+
+    for (line in lines) {
+        line = line.trim()
+        if (line.startsWith('def appVersion') && line.contains('?:')) {
+            def parts = line.split('\\?:', 2)
+            if (parts.length == 2) {
+                // Safe removal of quotes
+                def versionPart = parts[1].trim()
+                if ((versionPart.startsWith('"') && versionPart.endsWith('"')) ||
+                    (versionPart.startsWith("'") && versionPart.endsWith("'"))) {
+                    versionPart = versionPart.substring(1, versionPart.length() - 1)
+                }
+                return versionPart
+            }
+        }
+    }
+
+    steps.echo "⚠️ Could not find appVersion default, returning fallback"
+    return '0.0.1'
+}
 
     /**
      * Computes final version based on branch
