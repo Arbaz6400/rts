@@ -10,23 +10,23 @@ class VersionUtils implements Serializable {
     }
 
     /**
-     * Reads the default appVersion from build.gradle without using regex.
-     * Expects a line like: def appVersion = project.findProperty('appVersion') ?: '1.0.1'
+     * Reads default appVersion from build.gradle without regex or split.
      */
     String getDefaultVersion() {
         if (steps.fileExists('build.gradle')) {
             steps.echo "🔍 Reading default version from build.gradle..."
             def content = steps.readFile('build.gradle')
-            def lines = content.split('\n')
-
-            for (line in lines) {
+            content.eachLine { line ->
                 line = line.trim()
                 if (line.startsWith("def appVersion")) {
-                    def parts = line.split("\\?:")
-                    if (parts.size() == 2) {
-                        def versionPart = parts[1].trim()
-                        // remove quotes
-                        versionPart = versionPart.replaceAll(/^['"]|['"]$/, '')
+                    def idx = line.indexOf("?:")
+                    if (idx >= 0) {
+                        def versionPart = line.substring(idx + 2).trim()
+                        // remove quotes if any
+                        if ((versionPart.startsWith("'") && versionPart.endsWith("'")) ||
+                            (versionPart.startsWith('"') && versionPart.endsWith('"'))) {
+                            versionPart = versionPart[1..-2]
+                        }
                         return versionPart
                     }
                 }
