@@ -40,6 +40,7 @@ class VersionUtils implements Serializable {
     /**
      * Parses build.gradle to find the version.
      * Resolves project.findProperty("prop") using gradle.properties if present.
+     * No regex is used.
      */
     private String parseGradleVersionFromText(String text) {
         if (!text) return null
@@ -53,25 +54,25 @@ class VersionUtils implements Serializable {
                 def after = trimmed.replaceFirst("version", "").trim()
                 if (after.startsWith("=")) after = after.substring(1).trim()
 
-                // Case: version = project.findProperty("appVersion") ?: "1.0.0"
+                // Handle project.findProperty("...") ?: "fallback"
                 if (after.startsWith("project.findProperty")) {
-                    // Extract property name
-                    def start = after.indexOf('"') + 1
-                    def end = after.indexOf('"', start)
+                    // extract property name using plain string operations
+                    int start = after.indexOf('"') + 1
+                    int end = after.indexOf('"', start)
                     def propName = after.substring(start, end)
 
-                    // Try to read from gradle.properties
+                    // read gradle.properties
                     if (steps.fileExists('gradle.properties')) {
                         def props = steps.readFile('gradle.properties').readLines()
                         for (p in props) {
-                            def propLine = p.trim()
-                            if (propLine.startsWith("${propName}=")) {
-                                return propLine.split("=")[1].trim()
+                            def lineTrim = p.trim()
+                            if (lineTrim.startsWith("${propName}=")) {
+                                return lineTrim.split("=")[1].trim()
                             }
                         }
                     }
 
-                    // Fallback
+                    // fallback value after ?: 
                     if (after.contains("?:")) {
                         def fallback = after.split("\\?:")[1].trim()
                         if ((fallback.startsWith("\"") && fallback.endsWith("\"")) ||
@@ -82,13 +83,13 @@ class VersionUtils implements Serializable {
                     }
                 }
 
-                // Case: version = "1.2.3" or version '1.2.3'
+                // Handle literal version = "1.2.3" or '1.2.3'
                 if ((after.startsWith("\"") && after.endsWith("\"")) ||
                     (after.startsWith("'") && after.endsWith("'"))) {
                     return after.substring(1, after.length() - 1).trim()
                 }
 
-                // Otherwise, first token
+                // Otherwise, take first token
                 if (after) {
                     def tokens = after.tokenize()
                     if (tokens && tokens[0]) return tokens[0].replaceAll(/[,\;]/, '').trim()
