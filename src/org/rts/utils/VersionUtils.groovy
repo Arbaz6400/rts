@@ -10,16 +10,9 @@ class VersionUtils implements Serializable {
     }
 
     /**
-     * Returns the project version.
-     * Looks for pom.xml first, then build.gradle.
+     * Returns the project version from build.gradle
      */
     String getProjectVersion() {
-        if (steps.fileExists('pom.xml')) {
-            steps.echo "🔍 Found pom.xml, using Maven reader..."
-            def pom = steps.readMavenPom file: 'pom.xml'
-            return pom.version
-        }
-
         if (steps.fileExists('build.gradle')) {
             steps.echo "🔍 Found build.gradle, parsing version..."
             def text = steps.readFile('build.gradle')
@@ -32,7 +25,17 @@ class VersionUtils implements Serializable {
             }
         }
 
-        steps.error "❌ No pom.xml or build.gradle found in workspace"
+        steps.error "❌ build.gradle not found in workspace"
+    }
+
+    /**
+     * Returns version for a specific branch.
+     * Currently just returns the standard project version.
+     * Can be extended for branch-specific logic.
+     */
+    String getVersionForBranch(String branch) {
+        steps.echo "Getting version for branch: ${branch}"
+        return getProjectVersion()
     }
 
     /**
