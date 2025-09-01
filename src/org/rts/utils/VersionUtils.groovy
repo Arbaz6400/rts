@@ -10,94 +10,38 @@ class VersionUtils implements Serializable {
     }
 
     /**
-     * Returns the project version from build.gradle, resolving gradle.properties if needed
+     * Returns the project version.
+     * Checks gradle.properties first. Falls back to default.
      */
     String getProjectVersion() {
-        if (!steps.fileExists('build.gradle')) {
-            steps.error "❌ build.gradle not found in workspace"
-        }
+        def defaultVersion = "1.0.0"
 
-        steps.echo "🔍 Found build.gradle, parsing version..."
-        def text = steps.readFile('build.gradle')
-        try {
-            def version = parseGradleVersionFromText(text)
-            if (version) return version
-            steps.error "❌ Could not determine version from build.gradle"
-        } finally {
-            text = null
-        }
-    }
-
-    /**
-     * Returns version for a specific branch.
-     * Currently just returns the standard project version.
-     */
-    String getVersionForBranch(String branch) {
-        steps.echo "Getting version for branch: ${branch}"
-        return getProjectVersion()
-    }
-
-    /**
-     * Parses build.gradle to find the version.
-     * Resolves project.findProperty("prop") using gradle.properties if present.
-     * No regex is used.
-     */
-    private String parseGradleVersionFromText(String text) {
-        if (!text) return null
-
-        def lines = text.readLines()
-        try {
-            for (line in lines) {
+        if (steps.fileExists('gradle.properties')) {
+            def props = steps.readFile('gradle.properties').readLines()
+            for (line in props) {
                 def trimmed = line.trim()
-                if (!trimmed.startsWith("version")) continue
-
-                def after = trimmed.replaceFirst("version", "").trim()
-                if (after.startsWith("=")) after = after.substring(1).trim()
-
-                // Handle project.findProperty("...") ?: "fallback"
-                if (after.startsWith("project.findProperty")) {
-                    // extract property name using plain string operations
-                    int start = after.indexOf('"') + 1
-                    int end = after.indexOf('"', start)
-                    def propName = after.substring(start, end)
-
-                    // read gradle.properties
-                    if (steps.fileExists('gradle.properties')) {
-                        def props = steps.readFile('gradle.properties').readLines()
-                        for (p in props) {
-                            def lineTrim = p.trim()
-                            if (lineTrim.startsWith("${propName}=")) {
-                                return lineTrim.split("=")[1].trim()
-                            }
-                        }
-                    }
-
-                    // fallback value after ?: 
-                    if (after.contains("?:")) {
-                        def fallback = after.split("\\?:")[1].trim()
-                        if ((fallback.startsWith("\"") && fallback.endsWith("\"")) ||
-                            (fallback.startsWith("'") && fallback.endsWith("'"))) {
-                            return fallback.substring(1, fallback.length() - 1)
-                        }
-                        return fallback
-                    }
-                }
-
-                // Handle literal version = "1.2.3" or '1.2.3'
-                if ((after.startsWith("\"") && after.endsWith("\"")) ||
-                    (after.startsWith("'") && after.endsWith("'"))) {
-                    return after.substring(1, after.length() - 1).trim()
-                }
-
-                // Otherwise, take first token
-                if (after) {
-                    def tokens = after.tokenize()
-                    if (tokens && tokens[0]) return tokens[0].replaceAll(/[,\;]/, '').trim()
+                if (trimmed && trimmed.startsWith("version=")) {
+                    def value = trimmed.split("=")[1].trim()
+                    steps.echo "📌 Found version in gradle.properties: ${value}"
+                    return value
                 }
             }
-            return null
-        } finally {
-            lines = null
         }
+
+        // fallback if gradle.properties missing or version not defined
+        steps.echo "⚠️ version not found in gradle.properties, using default: ${defaultVersion}"
+        return defaultVersion
+    }
+
+    /**
+     * For branch-specific logic (optional)
+     */
+    String getVersionForBranch(String branch) {
+        def baseVersion = getProjectVersion()
+        // optionally append -SNAPSHOT for non-main branches
+        if (branch != "main" && !branch.endsWith("-SNAPSHOT")) {
+            return "${baseVersion}-SNAPSHOT"
+        }
+        return baseVersion
     }
 }
