@@ -10,28 +10,27 @@ class VersionUtils implements Serializable {
     }
 
     /**
-     * Returns the project version from build.gradle
+     * Returns the project version from build.gradle, resolving gradle.properties if needed
      */
     String getProjectVersion() {
-        if (steps.fileExists('build.gradle')) {
-            steps.echo "🔍 Found build.gradle, parsing version..."
-            def text = steps.readFile('build.gradle')
-            try {
-                def v = parseGradleVersionFromText(text)
-                if (v) return v
-                steps.error "❌ Could not find version in build.gradle"
-            } finally {
-                text = null
-            }
+        if (!steps.fileExists('build.gradle')) {
+            steps.error "❌ build.gradle not found in workspace"
         }
 
-        steps.error "❌ build.gradle not found in workspace"
+        steps.echo "🔍 Found build.gradle, parsing version..."
+        def text = steps.readFile('build.gradle')
+        try {
+            def version = parseGradleVersionFromText(text)
+            if (version) return version
+            steps.error "❌ Could not determine version from build.gradle"
+        } finally {
+            text = null
+        }
     }
 
     /**
      * Returns version for a specific branch.
      * Currently just returns the standard project version.
-     * Can be extended for branch-specific logic.
      */
     String getVersionForBranch(String branch) {
         steps.echo "Getting version for branch: ${branch}"
@@ -39,11 +38,8 @@ class VersionUtils implements Serializable {
     }
 
     /**
-     * Simple parser for build.gradle versions.
-     * Handles:
-     *  - version = "1.2.3"
-     *  - version '1.2.3'
-     *  - version = project.findProperty("version") ?: "1.0.0"
+     * Parses build.gradle to find the version.
+     * Resolves project.findProperty("prop") using gradle.properties if present.
      */
     private String parseGradleVersionFromText(String text) {
         if (!text) return null
@@ -51,30 +47,42 @@ class VersionUtils implements Serializable {
         def lines = text.readLines()
         try {
             for (line in lines) {
-                if (!line) continue
                 def trimmed = line.trim()
-                if (!trimmed.toLowerCase().startsWith("version")) continue
+                if (!trimmed.startsWith("version")) continue
 
-                // Remove "version" keyword
                 def after = trimmed.replaceFirst("version", "").trim()
-
-                // Remove '=' if present
                 if (after.startsWith("=")) after = after.substring(1).trim()
 
-                // Handle fallback: project.findProperty("version") ?: "1.0.0"
-                if (after.contains("?:")) {
-                    def parts = after.split("\\?:")
-                    if (parts.size() > 1) {
-                        def fallback = parts[1].trim()
+                // Case: version = project.findProperty("appVersion") ?: "1.0.0"
+                if (after.startsWith("project.findProperty")) {
+                    // Extract property name
+                    def start = after.indexOf('"') + 1
+                    def end = after.indexOf('"', start)
+                    def propName = after.substring(start, end)
+
+                    // Try to read from gradle.properties
+                    if (steps.fileExists('gradle.properties')) {
+                        def props = steps.readFile('gradle.properties').readLines()
+                        for (p in props) {
+                            def propLine = p.trim()
+                            if (propLine.startsWith("${propName}=")) {
+                                return propLine.split("=")[1].trim()
+                            }
+                        }
+                    }
+
+                    // Fallback
+                    if (after.contains("?:")) {
+                        def fallback = after.split("\\?:")[1].trim()
                         if ((fallback.startsWith("\"") && fallback.endsWith("\"")) ||
                             (fallback.startsWith("'") && fallback.endsWith("'"))) {
-                            return fallback.substring(1, fallback.length() - 1).trim()
+                            return fallback.substring(1, fallback.length() - 1)
                         }
                         return fallback
                     }
                 }
 
-                // Handle simple quoted versions
+                // Case: version = "1.2.3" or version '1.2.3'
                 if ((after.startsWith("\"") && after.endsWith("\"")) ||
                     (after.startsWith("'") && after.endsWith("'"))) {
                     return after.substring(1, after.length() - 1).trim()
