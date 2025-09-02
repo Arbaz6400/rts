@@ -9,6 +9,12 @@ class VersionUtils implements Serializable {
     }
 
     String getProjectVersion() {
+        // ✅ Prefer pipeline environment variable if already set
+        if (steps.env.APP_VERSION) {
+            steps.echo "📌 Using APP_VERSION from pipeline: ${steps.env.APP_VERSION}"
+            return steps.env.APP_VERSION
+        }
+
         if (steps.fileExists('pom.xml')) {
             steps.echo "🔍 Found pom.xml, using Maven reader..."
             def pom = steps.readMavenPom file: 'pom.xml'
@@ -24,7 +30,7 @@ class VersionUtils implements Serializable {
             for (line in gradleLines) {
                 def trimmed = line.trim()
 
-                // Capture def appVersion = project.findProperty(...) ?: '1.0.0'
+                // capture: def appVersion = project.findProperty('appVersion') ?: '1.0.0'
                 if (trimmed.startsWith("def appVersion")) {
                     if (trimmed.contains("?:")) {
                         def fallback = trimmed.split("\\?:")[1].trim()
@@ -37,7 +43,7 @@ class VersionUtils implements Serializable {
                     }
                 }
 
-                // Capture version = ...
+                // capture: version = ...
                 if (trimmed.startsWith("version")) {
                     def parts = trimmed.split("=")
                     if (parts.length == 2) {
