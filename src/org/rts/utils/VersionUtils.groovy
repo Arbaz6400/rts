@@ -48,4 +48,16 @@ class VersionUtils implements Serializable {
             steps.error "❌ No pom.xml or build.gradle found in workspace!"
         }
     }
+    String getVersionForBranch(String branchName) {
+    def baseVersion = getProjectVersion()
+    switch(branchName) {
+        case "develop":
+            return "${baseVersion}-SNAPSHOT"
+        case "release":
+            return "${baseVersion}-RC"
+        default:
+            return baseVersion
+    }
+}
+
 }
