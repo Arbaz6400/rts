@@ -16,28 +16,39 @@ class VersionUtils implements Serializable {
 
         } else if (steps.fileExists('build.gradle')) {
             steps.echo "🔍 Found build.gradle, parsing version..."
-            def gradleFile = steps.readFile('build.gradle').split("\n")
+            def gradleLines = steps.readFile('build.gradle').split("\n")
 
-            for (line in gradleFile) {
-                line = line.trim()
+            for (line in gradleLines) {
+                def trimmed = line.trim()
 
-                // Case 1: version = "x.y.z"
-                if (line.startsWith("version")) {
-                    def parts = line.split("=")
+                // Case 1: version = '1.0.0'
+                if (trimmed.startsWith("version")) {
+                    def parts = trimmed.split("=")
                     if (parts.length == 2) {
-                        def versionCandidate = parts[1].trim()
+                        def candidate = parts[1].trim()
                                 .replace("\"", "")
                                 .replace("'", "")
-                        if (versionCandidate) {
-                            return versionCandidate
+                        if (candidate) {
+                            return candidate
                         }
                     }
                 }
 
-                // Case 2: def appVersion = project.findProperty('appVersion') ?: '1.0.1'
-                if (line.startsWith("def appVersion")) {
-                    if (line.contains("?:")) {
-                        def parts = line.split("\\?:")
+                // Case 2: def appVersion = project.findProperty('appVersion') ?: '1.0.0'
+                if (trimmed.startsWith("def appVersion")) {
+                    if (trimmed.contains("?:")) {
+                        def parts = trimmed.split("\\?:")
+                        if (parts.length == 2) {
+                            def fallback = parts[1].trim()
+                                    .replace("\"", "")
+                                    .replace("'", "")
+                            if (fallback) {
+                                return fallback
+                            }
+                        }
+                    } else if (trimmed.contains("=")) {
+                        // case like: def appVersion = '1.0.0'
+                        def parts = trimmed.split("=")
                         if (parts.length == 2) {
                             def fallback = parts[1].trim()
                                     .replace("\"", "")
