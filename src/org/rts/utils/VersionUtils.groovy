@@ -21,11 +21,13 @@ class VersionUtils implements Serializable {
             for (line in gradleFile) {
                 line = line.trim()
 
-                // Case 1: direct version = 'x.y.z'
+                // Case 1: version = "x.y.z"
                 if (line.startsWith("version")) {
                     def parts = line.split("=")
                     if (parts.length == 2) {
-                        def versionCandidate = parts[1].trim().replaceAll("['\"]", "")
+                        def versionCandidate = parts[1].trim()
+                                .replace("\"", "")
+                                .replace("'", "")
                         if (versionCandidate) {
                             return versionCandidate
                         }
@@ -34,10 +36,16 @@ class VersionUtils implements Serializable {
 
                 // Case 2: def appVersion = project.findProperty('appVersion') ?: '1.0.1'
                 if (line.startsWith("def appVersion")) {
-                    def defaultMatch = (line =~ /['"]([^'"]+)['"]$/)
-                    if (defaultMatch) {
-                        def fallbackVersion = defaultMatch[0][1]
-                        return fallbackVersion
+                    if (line.contains("?:")) {
+                        def parts = line.split("\\?:")
+                        if (parts.length == 2) {
+                            def fallback = parts[1].trim()
+                                    .replace("\"", "")
+                                    .replace("'", "")
+                            if (fallback) {
+                                return fallback
+                            }
+                        }
                     }
                 }
             }
@@ -48,16 +56,16 @@ class VersionUtils implements Serializable {
             steps.error "❌ No pom.xml or build.gradle found in workspace!"
         }
     }
-    String getVersionForBranch(String branchName) {
-    def baseVersion = getProjectVersion()
-    switch(branchName) {
-        case "develop":
-            return "${baseVersion}-SNAPSHOT"
-        case "release":
-            return "${baseVersion}-RC"
-        default:
-            return baseVersion
-    }
-}
 
+    String getVersionForBranch(String branchName) {
+        def baseVersion = getProjectVersion()
+        switch (branchName) {
+            case "develop":
+                return "${baseVersion}-SNAPSHOT"
+            case "release":
+                return "${baseVersion}-RC"
+            default:
+                return baseVersion
+        }
+    }
 }
