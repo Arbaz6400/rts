@@ -13,64 +13,61 @@ class VersionUtils implements Serializable {
             steps.echo "🔍 Found pom.xml, using Maven reader..."
             def pom = steps.readMavenPom file: 'pom.xml'
             return pom.version
-
-        } else if (steps.fileExists('build.gradle')) {
+        } 
+        else if (steps.fileExists('build.gradle')) {
             steps.echo "🔍 Found build.gradle, parsing version..."
             def gradleLines = steps.readFile('build.gradle').split("\n")
+
+            String appVersionDefault = null
+            String versionValue = null
 
             for (line in gradleLines) {
                 def trimmed = line.trim()
 
-                // Case 1: version = '1.0.0'
-                if (trimmed.startsWith("version")) {
-                    def parts = trimmed.split("=")
-                    if (parts.length == 2) {
-                        def candidate = parts[1].trim()
-                                .replace("\"", "")
-                                .replace("'", "")
-                        if (candidate) {
-                            return candidate
+                // Capture def appVersion = project.findProperty(...) ?: '1.0.0'
+                if (trimmed.startsWith("def appVersion")) {
+                    if (trimmed.contains("?:")) {
+                        def fallback = trimmed.split("\\?:")[1].trim()
+                        appVersionDefault = fallback.replace("\"", "").replace("'", "")
+                    } else if (trimmed.contains("=")) {
+                        def parts = trimmed.split("=")
+                        if (parts.length == 2) {
+                            appVersionDefault = parts[1].trim().replace("\"", "").replace("'", "")
                         }
                     }
                 }
 
-                // Case 2: def appVersion = project.findProperty('appVersion') ?: '1.0.0'
-                if (trimmed.startsWith("def appVersion")) {
-                    if (trimmed.contains("?:")) {
-                        def parts = trimmed.split("\\?:")
-                        if (parts.length == 2) {
-                            def fallback = parts[1].trim()
-                                    .replace("\"", "")
-                                    .replace("'", "")
-                            if (fallback) {
-                                return fallback
-                            }
-                        }
-                    } else if (trimmed.contains("=")) {
-                        // case like: def appVersion = '1.0.0'
-                        def parts = trimmed.split("=")
-                        if (parts.length == 2) {
-                            def fallback = parts[1].trim()
-                                    .replace("\"", "")
-                                    .replace("'", "")
-                            if (fallback) {
-                                return fallback
-                            }
-                        }
+                // Capture version = ...
+                if (trimmed.startsWith("version")) {
+                    def parts = trimmed.split("=")
+                    if (parts.length == 2) {
+                        versionValue = parts[1].trim()
+                                .replace("\"", "")
+                                .replace("'", "")
                     }
                 }
             }
 
-            steps.error "❌ Could not determine version from build.gradle"
+            // If version points to appVersion, resolve it
+            if (versionValue == "appVersion") {
+                return appVersionDefault ?: "UNKNOWN"
+            }
 
-        } else {
+            // Otherwise, return version as-is
+            if (versionValue) {
+                return versionValue
+            }
+
+            steps.error "❌ Could not determine version from build.gradle"
+        } 
+        else {
             steps.error "❌ No pom.xml or build.gradle found in workspace!"
         }
     }
 
     String getVersionForBranch(String branchName) {
         def baseVersion = getProjectVersion()
-        switch (branchName) {
+        switch(branchName) {
             case "develop":
                 return "${baseVersion}-SNAPSHOT"
             case "release":
