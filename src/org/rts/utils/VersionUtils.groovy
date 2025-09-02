@@ -1,47 +1,51 @@
 package org.rts.utils
 
-import java.io.Serializable
-
 class VersionUtils implements Serializable {
+
     def steps
 
     VersionUtils(steps) {
         this.steps = steps
     }
 
-    /**
-     * Returns the project version.
-     * Checks gradle.properties first. Falls back to default.
-     */
     String getProjectVersion() {
-        def defaultVersion = "1.0.0"
+        if (steps.fileExists('pom.xml')) {
+            steps.echo "🔍 Found pom.xml, using Maven reader..."
+            def pom = steps.readMavenPom file: 'pom.xml'
+            return pom.version
 
-        if (steps.fileExists('gradle.properties')) {
-            def props = steps.readFile('gradle.properties').readLines()
-            for (line in props) {
-                def trimmed = line.trim()
-                if (trimmed && trimmed.startsWith("version=")) {
-                    def value = trimmed.split("=")[1].trim()
-                    steps.echo "📌 Found version in gradle.properties: ${value}"
-                    return value
+        } else if (steps.fileExists('build.gradle')) {
+            steps.echo "🔍 Found build.gradle, parsing version..."
+            def gradleFile = steps.readFile('build.gradle').split("\n")
+
+            for (line in gradleFile) {
+                line = line.trim()
+
+                // Case 1: direct version = 'x.y.z'
+                if (line.startsWith("version")) {
+                    def parts = line.split("=")
+                    if (parts.length == 2) {
+                        def versionCandidate = parts[1].trim().replaceAll("['\"]", "")
+                        if (versionCandidate) {
+                            return versionCandidate
+                        }
+                    }
+                }
+
+                // Case 2: def appVersion = project.findProperty('appVersion') ?: '1.0.1'
+                if (line.startsWith("def appVersion")) {
+                    def defaultMatch = (line =~ /['"]([^'"]+)['"]$/)
+                    if (defaultMatch) {
+                        def fallbackVersion = defaultMatch[0][1]
+                        return fallbackVersion
+                    }
                 }
             }
-        }
 
-        // fallback if gradle.properties missing or version not defined
-        steps.echo "⚠️ version not found in gradle.properties, using default: ${defaultVersion}"
-        return defaultVersion
-    }
+            steps.error "❌ Could not determine version from build.gradle"
 
-    /**
-     * For branch-specific logic (optional)
-     */
-    String getVersionForBranch(String branch) {
-        def baseVersion = getProjectVersion()
-        // optionally append -SNAPSHOT for non-main branches
-        if (branch != "main" && !branch.endsWith("-SNAPSHOT")) {
-            return "${baseVersion}-SNAPSHOT"
+        } else {
+            steps.error "❌ No pom.xml or build.gradle found in workspace!"
         }
-        return baseVersion
     }
 }
