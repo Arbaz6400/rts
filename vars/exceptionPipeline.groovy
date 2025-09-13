@@ -1,42 +1,36 @@
-// vars/exceptionPipeline.groovy
-def call(String pipelineName, String identifier) {
-
+def call(String pipelineName) {
     pipeline {
         agent any
         stages {
             stage('Checkout Exception List') {
                 steps {
-                    dir('exceptions') {
-                        git branch: 'main', url: 'https://github.com/Arbaz6400/exception-list.git'
-                    }
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: '*/main']],
+                        userRemoteConfigs: [[url: 'https://github.com/Arbaz6400/exception-list.git']]
+                    ])
                 }
             }
 
-            stage('Check Exception List') {
+            stage('Decide Scan') {
                 steps {
                     script {
-                        def yamlData = readYaml file: "exceptions/exceptions.yaml"
+                        // Get repo name from JOB_NAME, e.g. org/Leap2/main → Leap2
+                        def repoName = env.JOB_NAME?.tokenize('/')?.getAt(1)
+                        echo "Pipeline: ${pipelineName}, Identifier: ${repoName}"
 
-                        def exceptions = yamlData?.pipelines?.get(pipelineName) ?: []
-                        if (exceptions.contains(identifier)) {
-                            echo "Skipping scan: ${pipelineName}:${identifier} is in exception list."
-                            currentBuild.description = "Skipped scan for ${pipelineName}:${identifier}"
-                            env.SKIP_SCAN = "true"
+                        // Load exception list
+                        def yamlData = readYaml file: 'exceptions.yaml'
+                        def exceptions = (yamlData?.pipelines?.get(pipelineName) ?: []).collect { it.toString() }
+
+                        if (exceptions.contains(repoName)) {
+                            echo "${repoName} is in exception list → Skipping scan."
+                            currentBuild.result = 'SUCCESS'
                         } else {
-                            echo "${pipelineName}:${identifier} not in exception list. Proceeding with scan."
-                            env.SKIP_SCAN = "false"
+                            echo "${repoName} not in exception list → Running scan."
+                            // your scan stage goes here
                         }
                     }
-                }
-            }
-
-            stage('Run Scan') {
-                when {
-                    expression { return env.SKIP_SCAN == "false" }
-                }
-                steps {
-                    echo "Running scan for ${pipelineName} / ${identifier}..."
-                    // replace with actual scan command
                 }
             }
         }
