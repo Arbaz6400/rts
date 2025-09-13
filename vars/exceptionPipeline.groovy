@@ -1,5 +1,5 @@
 // vars/exceptionPipeline.groovy
-def call(String pipelineName, String identifier, String repoUrl, String branch, String filePath) {
+def call(String pipelineName, String identifier) {
 
     pipeline {
         agent any
@@ -7,7 +7,7 @@ def call(String pipelineName, String identifier, String repoUrl, String branch, 
             stage('Checkout Exception List') {
                 steps {
                     dir('exceptions') {
-                        git branch: branch, url: repoUrl
+                        git branch: 'main', url: 'https://github.com/Arbaz6400/exception-list.git'
                     }
                 }
             }
@@ -15,14 +15,15 @@ def call(String pipelineName, String identifier, String repoUrl, String branch, 
             stage('Check Exception List') {
                 steps {
                     script {
-                        def exceptions = readFile("exceptions/${filePath}").split("\n")*.trim()
-                        def entry = "${pipelineName}:${identifier}"
-                        if (exceptions.contains(entry)) {
-                            echo "Skipping scan: ${entry} is in exception list."
-                            currentBuild.description = "Skipped scan for ${entry}"
+                        def yamlData = readYaml file: "exceptions/exceptions.yaml"
+
+                        def exceptions = yamlData?.pipelines?.get(pipelineName) ?: []
+                        if (exceptions.contains(identifier)) {
+                            echo "Skipping scan: ${pipelineName}:${identifier} is in exception list."
+                            currentBuild.description = "Skipped scan for ${pipelineName}:${identifier}"
                             env.SKIP_SCAN = "true"
                         } else {
-                            echo "${entry} not in exception list. Proceeding with scan."
+                            echo "${pipelineName}:${identifier} not in exception list. Proceeding with scan."
                             env.SKIP_SCAN = "false"
                         }
                     }
@@ -35,7 +36,7 @@ def call(String pipelineName, String identifier, String repoUrl, String branch, 
                 }
                 steps {
                     echo "Running scan for ${pipelineName} / ${identifier}..."
-                    // your scan command here
+                    // replace with actual scan command
                 }
             }
         }
