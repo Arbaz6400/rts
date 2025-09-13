@@ -1,5 +1,6 @@
-// vars/exceptionHandler.groovy
-def call(String identifier, String repoUrl, String branch, String filePath, Closure scanStage) {
+// vars/exceptionPipeline.groovy
+def call(String pipelineName, String identifier, String repoUrl, String branch, String filePath) {
+
     pipeline {
         agent any
         stages {
@@ -15,12 +16,13 @@ def call(String identifier, String repoUrl, String branch, String filePath, Clos
                 steps {
                     script {
                         def exceptions = readFile("exceptions/${filePath}").split("\n")*.trim()
-                        if (exceptions.contains(identifier)) {
-                            echo "Skipping scan: ${identifier} is in exception list."
-                            currentBuild.description = "Skipped scan for ${identifier}"
+                        def entry = "${pipelineName}:${identifier}"
+                        if (exceptions.contains(entry)) {
+                            echo "Skipping scan: ${entry} is in exception list."
+                            currentBuild.description = "Skipped scan for ${entry}"
                             env.SKIP_SCAN = "true"
                         } else {
-                            echo "${identifier} not in exception list. Proceeding with scan."
+                            echo "${entry} not in exception list. Proceeding with scan."
                             env.SKIP_SCAN = "false"
                         }
                     }
@@ -32,9 +34,8 @@ def call(String identifier, String repoUrl, String branch, String filePath, Clos
                     expression { return env.SKIP_SCAN == "false" }
                 }
                 steps {
-                    script {
-                        scanStage()
-                    }
+                    echo "Running scan for ${pipelineName} / ${identifier}..."
+                    // your scan command here
                 }
             }
         }
