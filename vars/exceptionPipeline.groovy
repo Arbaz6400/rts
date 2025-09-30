@@ -11,7 +11,9 @@ def call() {
                         checkout([
                             $class: 'GitSCM',
                             branches: [[name: '*/main']],
-                            userRemoteConfigs: [[url: 'https://github.com/Arbaz6400/exception-list.git']]
+                            userRemoteConfigs: [[
+                                url: 'https://github.com/Arbaz6400/exception-list.git'
+                            ]]
                         ])
                     }
                 }
@@ -20,18 +22,22 @@ def call() {
             stage('Check Exception List') {
                 steps {
                     script {
-                        // repoName derived from JOB_NAME → org/Leap2/main → "Leap2"
-                        def repoName = env.JOB_NAME?.tokenize('/')?.getAt(1)
-                        echo "Repository detected: ${repoName}"
+                        // Full path: org/repo/branch
+                        def parts = env.JOB_NAME?.tokenize('/')
+                        def orgName  = parts?.getAt(0)
+                        def repoName = parts?.getAt(1)
+
+                        def fullName = "${orgName}/${repoName}"
+                        echo "Repository detected: ${fullName}"
 
                         def yamlData = readYaml file: 'exceptions/exceptions.yaml'
                         def exceptions = (yamlData?.exceptions ?: []).collect { it.toString() }
 
-                        if (exceptions.contains(repoName)) {
-                            echo "${repoName} is in exception list → will skip scan."
+                        if (exceptions.contains(fullName)) {
+                            echo "${fullName} is in exception list → will skip scan."
                             env.SKIP_SCAN = 'true'
                         } else {
-                            echo "${repoName} not in exception list → will run scan."
+                            echo "${fullName} not in exception list → will run scan."
                             env.SKIP_SCAN = 'false'
                         }
                     }
