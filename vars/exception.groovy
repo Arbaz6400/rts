@@ -3,6 +3,7 @@ def call() {
         agent any
         environment {
             SKIP_SCAN = 'false'   // default
+            ORG_REPO = ''         // will hold GitHub org/repo
         }
         stages {
             stage('Checkout Exception List') {
@@ -36,6 +37,9 @@ def call() {
                         def orgRepo = parts[-2] + '/' + parts[-1]
                         echo "Repository detected from GitHub → ${orgRepo}"
 
+                        // Store in env for later stages
+                        env.ORG_REPO = orgRepo
+
                         // Load exceptions
                         def yamlData = readYaml file: 'exceptions/exceptions.yaml'
                         def exceptions = (yamlData?.exceptions ?: []).collect { it.toString().trim() }
@@ -58,7 +62,7 @@ def call() {
                     expression { return env.SKIP_SCAN == 'false' }
                 }
                 steps {
-                    echo "Running scan for repo → ${env.JOB_NAME}"
+                    echo "Running scan for repo → ${env.ORG_REPO}"
                     // your actual scan logic here
                 }
             }
@@ -68,7 +72,7 @@ def call() {
                     expression { return env.SKIP_SCAN == 'true' }
                 }
                 steps {
-                    echo "Skipping scan but still doing other tasks..."
+                    echo "Skipping scan for repo → ${env.ORG_REPO}, but still doing other tasks..."
                 }
             }
         }
