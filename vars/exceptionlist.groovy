@@ -41,5 +41,9 @@ def call() {
 
 def runScan(repo) {
     echo "Running scan for repo: ${repo}"
-    sh "echo 'Scan logic goes here for ${repo}'"
+    if (isUnix()) {
+        sh "echo Scan logic goes here for ${repo}"
+    } else {
+        bat "echo Scan logic goes here for ${repo}"
+    }
 }
