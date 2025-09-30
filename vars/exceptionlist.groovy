@@ -7,7 +7,7 @@ def call() {
                     script {
                         echo "→ Starting exception list check"
 
-                        // Checkout exception list repo
+                        // Checkout exception list
                         dir('exceptions') {
                             checkout([
                                 $class: 'GitSCM',
@@ -19,19 +19,16 @@ def call() {
                             ])
                         }
 
-                        // Read exceptions YAML
+                        // Read YAML
                         def exceptionsYaml = readYaml file: 'exceptions/exceptions.yaml'
                         echo "→ Exceptions loaded: ${exceptionsYaml}"
 
-                        // Extract org and repo from main repo URL
+                        // Get current repo org/name from Git URL
                         def gitUrl = scm.getUserRemoteConfigs()[0].getUrl()
-                        def parts = gitUrl.tokenize('/')            // split URL by '/'
-                        def org = parts[-2]                         // second last part is org
-                        def repo = parts[-1].replace('.git','')     // last part is repo (remove .git)
-                        def orgRepo = "${org}/${repo}"
-                        echo "→ Current org: ${org}, repo: ${repo}"
+                        def orgRepo = gitUrl.split('/')[-2..-1].join('/').replaceAll(/\.git$/, '')
+                        echo "→ Current org: ${orgRepo.split('/')[0]}, repo: ${orgRepo.split('/')[1]}"
 
-                        // Check against exceptions
+                        // Check exceptions
                         if (exceptionsYaml.exceptions.contains(orgRepo)) {
                             echo "→ Repo '${orgRepo}' is in exceptions → skipping scan"
                         } else {
@@ -47,7 +44,6 @@ def call() {
     }
 }
 
-// Run scan logic
 def runScan(orgRepo) {
     echo "Running scan for repo: ${orgRepo}"
     if (isUnix()) {
