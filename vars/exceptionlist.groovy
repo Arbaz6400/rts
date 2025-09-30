@@ -7,6 +7,7 @@ def call() {
                     script {
                         echo "→ Starting exception list check"
 
+                        // Checkout exception list repo
                         dir('exceptions') {
                             checkout([
                                 $class: 'GitSCM',
@@ -18,19 +19,24 @@ def call() {
                             ])
                         }
 
+                        // Read exceptions YAML
                         def exceptionsYaml = readYaml file: 'exceptions/exceptions.yaml'
                         echo "→ Exceptions loaded: ${exceptionsYaml}"
-                        
-                        def gitUrl = scm.getUserRemoteConfigs()[0].getUrl()
-                        def orgRepo = gitUrl.split('/')[-2..-1].join('/')  // Leap-stream/Leap2
-                        def repo = gitUrl.split('/')[-1].replace('.git', '') // Leap2
-                        echo "→ Current org: ${orgRepo.split('/')[0]}, repo: ${repo}"
 
+                        // Extract org and repo from main repo URL
+                        def gitUrl = scm.getUserRemoteConfigs()[0].getUrl()
+                        def parts = gitUrl.tokenize('/')            // split URL by '/'
+                        def org = parts[-2]                         // second last part is org
+                        def repo = parts[-1].replace('.git','')     // last part is repo (remove .git)
+                        def orgRepo = "${org}/${repo}"
+                        echo "→ Current org: ${org}, repo: ${repo}"
+
+                        // Check against exceptions
                         if (exceptionsYaml.exceptions.contains(orgRepo)) {
                             echo "→ Repo '${orgRepo}' is in exceptions → skipping scan"
                         } else {
                             echo "→ Repo '${orgRepo}' is NOT in exceptions → running scan"
-                            runScan(orgRepo)   // pass full org/repo
+                            runScan(orgRepo)
                         }
 
                         echo "→ Exception list check finished"
@@ -41,6 +47,7 @@ def call() {
     }
 }
 
+// Run scan logic
 def runScan(orgRepo) {
     echo "Running scan for repo: ${orgRepo}"
     if (isUnix()) {
