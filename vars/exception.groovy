@@ -49,6 +49,15 @@ def call() {
                 }
             }
 
+            stage('Debug') {
+                steps {
+                    script {
+                        echo "DEBUG → SKIP_SCAN = ${env.SKIP_SCAN}"
+                        echo "DEBUG → ORG_REPO = ${env.ORG_REPO}"
+                    }
+                }
+            }
+
             stage('Run Scan') {
                 when {
                     expression { env.SKIP_SCAN == 'false' }
