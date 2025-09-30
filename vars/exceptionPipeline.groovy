@@ -1,4 +1,3 @@
-```groovy
 def call() {
     pipeline {
         agent any
@@ -66,4 +65,3 @@ def call() {
         }
     }
 }
-```
