@@ -2,8 +2,8 @@ def call() {
     pipeline {
         agent any
         environment {
-            SKIP_SCAN = 'false'   // default
-            ORG_REPO = ''         // will hold GitHub org/repo
+            SKIP_SCAN = 'false'
+            ORG_REPO = ''
         }
         stages {
             stage('Checkout Exception List') {
@@ -23,24 +23,19 @@ def call() {
             stage('Check Exception List') {
                 steps {
                     script {
-                        // Get repo URL from SCM
+                        // Get repo URL
                         def repoUrl = scm.userRemoteConfigs[0].url
-                        echo "Full repo URL → ${repoUrl}"
-
-                        // Remove trailing .git if present
                         if (repoUrl.endsWith(".git")) {
                             repoUrl = repoUrl[0..-5]
                         }
-
-                        // Split and extract org/repo
                         def parts = repoUrl.tokenize('/')
                         def orgRepo = parts[-2] + '/' + parts[-1]
+
                         echo "Repository detected from GitHub → ${orgRepo}"
 
-                        // ✅ Store in env as a string for later stages
-                        env.ORG_REPO = "${orgRepo}"
+                        // ✅ Persist across pipeline
+                        env.ORG_REPO = orgRepo
 
-                        // Load exceptions
                         def yamlData = readYaml file: 'exceptions/exceptions.yaml'
                         def exceptions = (yamlData?.exceptions ?: []).collect { it.toString().trim() }
 
@@ -63,7 +58,7 @@ def call() {
                 }
                 steps {
                     echo "Running scan for repo → ${env.ORG_REPO}"
-                    // your actual scan logic here
+                    // scanner logic here
                 }
             }
 
@@ -72,7 +67,7 @@ def call() {
                     expression { return env.SKIP_SCAN == 'true' }
                 }
                 steps {
-                    echo "Skipping scan for repo → ${env.ORG_REPO}, but still doing other tasks..."
+                    echo "Skipping scan for repo → ${env.ORG_REPO}, running post-success steps."
                 }
             }
         }
