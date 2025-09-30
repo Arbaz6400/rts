@@ -1,11 +1,9 @@
 def call() {
     pipeline {
         agent any
-
         environment {
             SKIP_SCAN = 'false'   // default
         }
-
         stages {
             stage('Checkout Exception List') {
                 steps {
@@ -24,8 +22,9 @@ def call() {
             stage('Check Exception List') {
                 steps {
                     script {
-                        // Build org/repo from JOB_NAME → org/Leap2/main → "org/Leap2"
-                        def orgRepo = env.JOB_NAME?.tokenize('/')?.getAt(0..1)?.join('/')
+                        // Build org/repo from the last 3 parts of JOB_NAME
+                        def parts = env.JOB_NAME?.tokenize('/')
+                        def orgRepo = parts[-3] + '/' + parts[-2]
                         echo "Repository detected: ${orgRepo}"
 
                         def yamlData = readYaml file: 'exceptions/exceptions.yaml'
