@@ -16,8 +16,6 @@ userRemoteConfigs: [[url: '[https://github.com/Arbaz6400/exception-list.git](htt
 }
 }
 }
-
-```
         stage('Check Exception List') {
             steps {
                 script {
@@ -61,6 +59,6 @@ userRemoteConfigs: [[url: '[https://github.com/Arbaz6400/exception-list.git](htt
         }
     }
 }
-```
+
 
 }
