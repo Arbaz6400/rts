@@ -7,6 +7,7 @@ def call() {
                     script {
                         echo "→ Starting exception list check"
 
+                        // Checkout exception list repo
                         dir('exceptions') {
                             checkout([
                                 $class: 'GitSCM',
@@ -18,16 +19,22 @@ def call() {
                             ])
                         }
 
+                        // Read exceptions YAML
                         def exceptionsYaml = readYaml file: 'exceptions/exceptions.yaml'
                         echo "→ Exceptions loaded: ${exceptionsYaml}"
-                        
-                        def repoName = env.JOB_NAME.split('/')[1]   // adjust if needed
-                        echo "→ Current repo: ${repoName}"
 
-                        if (exceptionsYaml.exceptions.contains(repoName)) {
-                            echo "→ Repo '${repoName}' is in exceptions → skipping scan"
+                        // Get org/repo from SCM URL
+                        def scmUrl = scm.getUserRemoteConfigs()[0].getUrl()
+                        def parts = scmUrl.split('/')
+                        def orgName = parts[-2]          // second-to-last part
+                        def repoName = parts[-1].replace('.git','')  // last part without .git
+                        echo "→ Current org: ${orgName}, repo: ${repoName}"
+
+                        // Check if repo is in exceptions
+                        if (exceptionsYaml.exceptions.contains("${orgName}/${repoName}")) {
+                            echo "→ Repo '${orgName}/${repoName}' is in exceptions → skipping scan"
                         } else {
-                            echo "→ Repo '${repoName}' is NOT in exceptions → running scan"
+                            echo "→ Repo '${orgName}/${repoName}' is NOT in exceptions → running scan"
                             runScan(repoName)
                         }
 
@@ -39,6 +46,7 @@ def call() {
     }
 }
 
+// Scan logic
 def runScan(repo) {
     echo "Running scan for repo: ${repo}"
     if (isUnix()) {
