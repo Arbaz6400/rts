@@ -3,7 +3,6 @@ def call() {
         agent any
         environment {
             SKIP_SCAN = 'false'
-            ORG_REPO = ''
         }
         stages {
             stage('Checkout Exception List') {
@@ -23,17 +22,15 @@ def call() {
             stage('Check Exception List') {
                 steps {
                     script {
-                        // Get repo URL
                         def repoUrl = scm.userRemoteConfigs[0].url
                         if (repoUrl.endsWith(".git")) {
                             repoUrl = repoUrl[0..-5]
                         }
                         def parts = repoUrl.tokenize('/')
                         def orgRepo = parts[-2] + '/' + parts[-1]
-
                         echo "Repository detected from GitHub → ${orgRepo}"
 
-                        // ✅ Persist across pipeline
+                        // store in env so later stages can use
                         env.ORG_REPO = orgRepo
 
                         def yamlData = readYaml file: 'exceptions/exceptions.yaml'
@@ -54,7 +51,7 @@ def call() {
 
             stage('Run Scan') {
                 when {
-                    expression { return env.SKIP_SCAN == 'false' }
+                    expression { env.SKIP_SCAN == 'false' }
                 }
                 steps {
                     echo "Running scan for repo → ${env.ORG_REPO}"
@@ -64,7 +61,7 @@ def call() {
 
             stage('Post-Success Task') {
                 when {
-                    expression { return env.SKIP_SCAN == 'true' }
+                    expression { env.SKIP_SCAN == 'true' }
                 }
                 steps {
                     echo "Skipping scan for repo → ${env.ORG_REPO}, running post-success steps."
