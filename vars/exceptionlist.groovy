@@ -7,7 +7,6 @@ def call() {
                     script {
                         echo "→ Starting exception list check"
 
-                        // Checkout the exception list
                         dir('exceptions') {
                             checkout([
                                 $class: 'GitSCM',
@@ -19,25 +18,19 @@ def call() {
                             ])
                         }
 
-                        // Load exceptions.yaml
                         def exceptionsYaml = readYaml file: 'exceptions/exceptions.yaml'
                         echo "→ Exceptions loaded: ${exceptionsYaml}"
+                        
+                        def gitUrl = scm.getUserRemoteConfigs()[0].getUrl()
+                        def orgRepo = gitUrl.split('/')[-2..-1].join('/')  // Leap-stream/Leap2
+                        def repo = gitUrl.split('/')[-1].replace('.git', '') // Leap2
+                        echo "→ Current org: ${orgRepo.split('/')[0]}, repo: ${repo}"
 
-                        // Extract org and repo from the Git URL
-                        def gitUrl = env.GIT_URL ?: 'https://github.com/Leap-stream/Leap2.git'
-                        def parts = gitUrl.tokenize('/')     // simple split by '/'
-                        def orgName = parts[-2]
-                        def repoName = parts[-1].replaceAll(/\.git$/, '')
-
-                        echo "→ Current org: ${orgName}, repo: ${repoName}"
-
-                        // Check against exceptions list
-                        def fullRepo = "${orgName}/${repoName}"
-                        if (exceptionsYaml.exceptions.contains(fullRepo)) {
-                            echo "→ Repo '${fullRepo}' is in exceptions → skipping scan"
+                        if (exceptionsYaml.exceptions.contains(orgRepo)) {
+                            echo "→ Repo '${orgRepo}' is in exceptions → skipping scan"
                         } else {
-                            echo "→ Repo '${fullRepo}' is NOT in exceptions → running scan"
-                            runScan(repoName)
+                            echo "→ Repo '${orgRepo}' is NOT in exceptions → running scan"
+                            runScan(orgRepo)   // pass full org/repo
                         }
 
                         echo "→ Exception list check finished"
@@ -48,12 +41,11 @@ def call() {
     }
 }
 
-// Scan logic with cross-platform support
-def runScan(repo) {
-    echo "Running scan for repo: ${repo}"
+def runScan(orgRepo) {
+    echo "Running scan for repo: ${orgRepo}"
     if (isUnix()) {
-        sh "echo Scan logic goes here for ${repo}"
+        sh "echo Scan logic goes here for ${orgRepo}"
     } else {
-        bat "echo Scan logic goes here for ${repo}"
+        bat "echo Scan logic goes here for ${orgRepo}"
     }
 }
