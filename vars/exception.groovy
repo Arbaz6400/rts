@@ -1,62 +1,71 @@
-pipeline {
-    agent any
-
-    environment {
-        SKIP_SCAN = false   // default
-    }
-
-    stages {
-        stage('Checkout SCM') {
-            steps {
-                checkout scm
-            }
+def call() {
+    pipeline {
+        agent any
+        environment {
+            SKIP_SCAN = 'false'
         }
-
-        stage('Checkout Exception List') {
-            steps {
-                dir('exceptions') {
-                    git url: 'https://github.com/Arbaz6400/exception-list.git', branch: 'main'
-                }
-            }
-        }
-
-        stage('Check Exception List') {
-            steps {
-                script {
-                    // Read YAML file
-                    def exceptions = readYaml file: 'exceptions/exceptions.yaml'
-                    
-                    // Detect repo
-                    def repo = env.GIT_URL.tokenize('/').takeRight(2).join('/')
-                    echo "Repository detected from GitHub → ${repo}"
-                    
-                    if (exceptions.contains(repo)) {
-                        echo "${repo} is in exception list → will skip scan."
-                        env.SKIP_SCAN = 'true'
-                    } else {
-                        echo "${repo} not in exception list → will run scan."
-                        env.SKIP_SCAN = 'false'
+        stages {
+            stage('Checkout Exception List') {
+                steps {
+                    dir('exceptions') {
+                        checkout([
+                            $class: 'GitSCM',
+                            branches: [[name: '*/main']],
+                            userRemoteConfigs: [[
+                                url: 'https://github.com/Arbaz6400/exception-list.git'
+                            ]]
+                        ])
                     }
                 }
             }
-        }
 
-        stage('Run Scan') {
-            when {
-                expression { return env.SKIP_SCAN == 'false' }
-            }
-            steps {
-                echo "Running scan for repo → ${env.GIT_URL}"
-                // Your sonar scan steps here
-            }
-        }
+            stage('Check Exception List') {
+                steps {
+                    script {
+                        def repoUrl = scm.userRemoteConfigs[0].url
+                        if (repoUrl.endsWith(".git")) {
+                            repoUrl = repoUrl[0..-5]
+                        }
+                        def parts = repoUrl.tokenize('/')
+                        def orgRepo = parts[-2] + '/' + parts[-1]
+                        echo "Repository detected from GitHub → ${orgRepo}"
 
-        stage('Post-Success Task') {
-            when {
-                expression { return env.SKIP_SCAN == 'false' }
+                        // store in env so later stages can use
+                        env.ORG_REPO = orgRepo
+
+                        def yamlData = readYaml file: 'exceptions/exceptions.yaml'
+                        def exceptions = (yamlData?.exceptions ?: []).collect { it.toString().trim() }
+
+                        echo "Exceptions from YAML → ${exceptions}"
+
+                        if (exceptions.contains(orgRepo)) {
+                            echo "${orgRepo} is in exception list → will skip scan."
+                            env.SKIP_SCAN = 'true'
+                        } else {
+                            echo "${orgRepo} not in exception list → will run scan."
+                            env.SKIP_SCAN = 'false'
+                        }
+                    }
+                }
             }
-            steps {
-                echo "Post-scan tasks running..."
+
+            stage('Run Scan') {
+                when {
+                    expression { env.SKIP_SCAN == 'false' }
+                }
+                steps {
+                    echo "Running scan for repo → ${env.ORG_REPO}"
+                    // scanner logic here
+                }
+            }
+
+            stage('Post-Success Task') {
+                when {
+                    expression { env.SKIP_SCAN == 'true' }
+                }
+                steps {
+                    echo "Skipping scan for repo → ${env.ORG_REPO}, running post-success steps."
+                }
             }
         }
     }
