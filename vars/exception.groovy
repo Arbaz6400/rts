@@ -1,74 +1,66 @@
-// vars/exception.groovy
-def call() {
-    pipeline {
-        agent any
+pipeline {
+    agent any
 
-        environment {
-            // default, if you still need env var
-            SKIP_SCAN = 'false'
+    environment {
+        ORG_REPO = ''  // will be set dynamically
+    }
+
+    stages {
+
+        stage('Checkout SCM') {
+            steps {
+                checkout scm
+            }
         }
 
-        stages {
-            stage('Checkout Exception List') {
-                steps {
-                    dir('exceptions') {
-                        checkout([
-                            $class: 'GitSCM',
-                            branches: [[name: '*/main']],
-                            userRemoteConfigs: [[
-                                url: 'https://github.com/Arbaz6400/exception-list.git'
-                            ]]
-                        ])
-                    }
+        stage('Checkout Exception List') {
+            steps {
+                dir('exceptions') {
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: '*/main']],
+                        userRemoteConfigs: [[
+                            url: 'https://github.com/Arbaz6400/exception-list.git'
+                        ]]
+                    ])
                 }
             }
+        }
 
-            stage('Check Exception List') {
-                steps {
-                    script {
-                        def repoUrl = scm.userRemoteConfigs[0].url
-                        if (repoUrl.endsWith(".git")) repoUrl = repoUrl[0..-5]
-                        def parts = repoUrl.tokenize('/')
-                        def orgRepo = parts[-2] + '/' + parts[-1]
+        stage('Check Exception List') {
+            steps {
+                script {
+                    ORG_REPO = "${env.JOB_NAME}" // or dynamically detect repo
+                    def exceptionsYaml = readYaml file: 'exceptions/exceptions.yaml'
+                    def exceptions = exceptionsYaml.exceptions
 
-                        def yamlData = readYaml file: 'exceptions/exceptions.yaml'
-                        def exceptions = (yamlData?.exceptions ?: []).collect { it.toString().trim() }
+                    boolean SKIP_SCAN = exceptions.contains(ORG_REPO)
+                    echo "Repository → ${ORG_REPO}"
+                    echo "Exceptions → ${exceptions}"
+                    echo "DEBUG → SKIP_SCAN = ${SKIP_SCAN}"
 
-                        echo "Repository → ${orgRepo}"
-                        echo "Exceptions → ${exceptions}"
-
-                        // use a groovy variable for reliable conditional
-                        env.SKIP_SCAN = exceptions.contains(orgRepo).toString()
-                        env.ORG_REPO = orgRepo
-                    }
+                    // Store it in environment so it can be accessed in other stages
+                    env.SKIP_SCAN = SKIP_SCAN.toString()
                 }
             }
+        }
 
-            stage('Debug') {
-                steps {
-                    script {
-                        echo "DEBUG → SKIP_SCAN = ${env.SKIP_SCAN}"
-                        echo "DEBUG → ORG_REPO = ${env.ORG_REPO}"
-                    }
-                }
+        stage('Run Scan') {
+            when { 
+                expression { return env.SKIP_SCAN.toBoolean() == false } 
             }
-
-            stage('Run Scan') {
-                when {
-                    expression { env.SKIP_SCAN == 'false' }
-                }
-                steps {
-                    echo "Running scan → ${env.ORG_REPO}"
-                }
+            steps {
+                echo "Running scan → ${ORG_REPO}"
+                // Your actual scan commands here
             }
+        }
 
-            stage('Post-Success Task') {
-                when {
-                    expression { env.SKIP_SCAN == 'true' }
-                }
-                steps {
-                    echo "Skipping scan → ${env.ORG_REPO}"
-                }
+        stage('Post-Success Task') {
+            when { 
+                expression { return env.SKIP_SCAN.toBoolean() == false } 
+            }
+            steps {
+                echo "Post-scan tasks for ${ORG_REPO}"
             }
         }
     }
