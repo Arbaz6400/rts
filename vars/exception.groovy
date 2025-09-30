@@ -37,8 +37,8 @@ def call() {
                         def orgRepo = parts[-2] + '/' + parts[-1]
                         echo "Repository detected from GitHub → ${orgRepo}"
 
-                        // Store in env for later stages
-                        env.ORG_REPO = orgRepo
+                        // ✅ Store in env as a string for later stages
+                        env.ORG_REPO = "${orgRepo}"
 
                         // Load exceptions
                         def yamlData = readYaml file: 'exceptions/exceptions.yaml'
