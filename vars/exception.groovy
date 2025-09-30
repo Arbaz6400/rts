@@ -1,12 +1,10 @@
 pipeline {
     agent any
-
     environment {
-        ORG_REPO = ''  // will be set dynamically
+        SKIP_SCAN = 'false'  // default
+        ORG_REPO = ''        // will be set dynamically
     }
-
     stages {
-
         stage('Checkout SCM') {
             steps {
                 checkout scm
@@ -30,34 +28,48 @@ pipeline {
         stage('Check Exception List') {
             steps {
                 script {
-                    ORG_REPO = "${env.JOB_NAME}" // or dynamically detect repo
+                    // Detect repo name dynamically if needed
+                    ORG_REPO = env.JOB_NAME.split('/')[-1] // optional, or set manually
                     def exceptionsYaml = readYaml file: 'exceptions/exceptions.yaml'
-                    def exceptions = exceptionsYaml.exceptions
-
-                    boolean SKIP_SCAN = exceptions.contains(ORG_REPO)
+                    def exceptions = exceptionsYaml.exceptions // must be a list
                     echo "Repository → ${ORG_REPO}"
                     echo "Exceptions → ${exceptions}"
-                    echo "DEBUG → SKIP_SCAN = ${SKIP_SCAN}"
 
-                    // Store it in environment so it can be accessed in other stages
-                    env.SKIP_SCAN = SKIP_SCAN.toString()
+                    // Determine if scan should be skipped
+                    if (exceptions.contains(ORG_REPO)) {
+                        env.SKIP_SCAN = 'true'
+                        echo "${ORG_REPO} is in exception list → will skip scan."
+                    } else {
+                        env.SKIP_SCAN = 'false'
+                        echo "${ORG_REPO} is not in exception list → will run scan."
+                    }
+                }
+            }
+        }
+
+        stage('Debug') {
+            steps {
+                script {
+                    echo "DEBUG → SKIP_SCAN = ${env.SKIP_SCAN}"
+                    echo "DEBUG → ORG_REPO = ${ORG_REPO}"
                 }
             }
         }
 
         stage('Run Scan') {
-            when { 
-                expression { return env.SKIP_SCAN.toBoolean() == false } 
+            when {
+                expression { return env.SKIP_SCAN.toBoolean() == false }
             }
             steps {
                 echo "Running scan → ${ORG_REPO}"
-                // Your actual scan commands here
+                // Add your actual scan command here, e.g.
+                // sh './gradlew sonarScan'
             }
         }
 
         stage('Post-Success Task') {
-            when { 
-                expression { return env.SKIP_SCAN.toBoolean() == false } 
+            when {
+                expression { return env.SKIP_SCAN.toBoolean() == false }
             }
             steps {
                 echo "Post-scan tasks for ${ORG_REPO}"
