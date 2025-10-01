@@ -62,12 +62,11 @@
 //     }
 // }
 
-
-// Global variables
-def SKIP_SONAR = "false"
-def SKIP_CHECKMARX = "false"
-
 def call() {
+    // Local flags inside the pipeline
+    def SKIP_SONAR = "false"
+    def SKIP_CHECKMARX = "false"
+
     pipeline {
         agent any
         stages {
@@ -88,48 +87,39 @@ def call() {
                             ])
                         }
 
-                        // Read YAML
                         def exceptionsYaml = readYaml file: 'exceptions/exceptions.yaml'
 
-                        // Print lists in logs
                         echo "→ Sonar exceptions: ${exceptionsYaml.exceptions.sonar}"
                         echo "→ Checkmarx exceptions: ${exceptionsYaml.exceptions.checkmarx}"
 
-                        // Get current repo org/name
                         def gitUrl = scm.getUserRemoteConfigs()[0].getUrl()
                         def orgRepo = gitUrl.split('/')[-2..-1].join('/').replaceAll(/\.git$/, '')
-                        echo "→ Current org: ${orgRepo.split('/')[0]}, repo: ${orgRepo.split('/')[1]}"
 
-                        // Check if repo is in sonar exceptions
-                        if (exceptionsYaml.exceptions.sonar.contains(orgRepo)) {
+                        if (exceptionsYaml.exceptions.sonar?.contains(orgRepo)) {
                             SKIP_SONAR = "true"
-                            echo "→ Repo '${orgRepo}' is in Sonar exceptions → skipping Sonar"
-                        } else {
-                            echo "→ Repo '${orgRepo}' is NOT in Sonar exceptions → running Sonar"
                         }
-
-                        // Check if repo is in checkmarx exceptions
-                        if (exceptionsYaml.exceptions.checkmarx.contains(orgRepo)) {
+                        if (exceptionsYaml.exceptions.checkmarx?.contains(orgRepo)) {
                             SKIP_CHECKMARX = "true"
-                            echo "→ Repo '${orgRepo}' is in Checkmarx exceptions → skipping Checkmarx"
-                        } else {
-                            echo "→ Repo '${orgRepo}' is NOT in Checkmarx exceptions → running Checkmarx"
                         }
 
-                        echo "→ SKIP_SONAR: ${SKIP_SONAR}, SKIP_CHECKMARX: ${SKIP_CHECKMARX}"
+                        echo "→ SKIP_SONAR=${SKIP_SONAR}, SKIP_CHECKMARX=${SKIP_CHECKMARX}"
+
+                        // store them into env so they can be used in later stages
+                        env.SKIP_SONAR = SKIP_SONAR
+                        env.SKIP_CHECKMARX = SKIP_CHECKMARX
                     }
                 }
             }
 
             stage('Sonar Scan') {
-                when { expression { SKIP_SONAR == "false" } }
+                when { expression { env.SKIP_SONAR == "false" } }
                 steps {
                     echo "🚀 Running SonarQube Scan"
                 }
             }
 
             stage('Checkmarx Scan') {
-                when { expression { SKIP_CHECKMARX == "false" } }
+                when { expression { env.SKIP_CHECKMARX == "false" } }
                 steps {
                     echo "🔍 Running Checkmarx Scan"
                 }
@@ -137,4 +127,3 @@ def call() {
         }
     }
 }
-
