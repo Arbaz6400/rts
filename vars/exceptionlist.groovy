@@ -47,15 +47,24 @@ def call() {
                 }
             }
 
-            stage('Scan Status') {
+            stage('Run Scan') {
+                when {
+                    expression { env.SKIP_SCAN == "false" }
+                }
                 steps {
                     script {
-                        if (env.SKIP_SCAN == 'true') {
-                            echo "→ Scan skipped ✅ (SKIP_SCAN=${env.SKIP_SCAN})"
-                        } else {
-                            echo "→ Scan executed 🚀 (SKIP_SCAN=${env.SKIP_SCAN})"
-                        }
+                        echo "→ Scan executed 🚀 (SKIP_SCAN=${env.SKIP_SCAN})"
+                        runScan("dummy") // replace "dummy" with actual orgRepo if needed
                     }
+                }
+            }
+
+            stage('Skip Notice') {
+                when {
+                    expression { env.SKIP_SCAN == "true" }
+                }
+                steps {
+                    echo "→ Scan skipped ❌ (SKIP_SCAN=${env.SKIP_SCAN})"
                 }
             }
         }
