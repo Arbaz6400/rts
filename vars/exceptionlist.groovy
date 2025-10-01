@@ -33,10 +33,10 @@ def call() {
 
                         // Check exceptions
                         if (exceptionsYaml.exceptions.contains(orgRepo)) {
-                            env.SKIP_SCAN = 'true'
+                            env.SKIP_SCAN = "true"
                             echo "→ Repo '${orgRepo}' is in exceptions → skipping scan"
                         } else {
-                            env.SKIP_SCAN = 'false'
+                            env.SKIP_SCAN = "false"
                             echo "→ Repo '${orgRepo}' is NOT in exceptions → running scan"
                             runScan(orgRepo)
                         }
