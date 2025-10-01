@@ -2,7 +2,7 @@ def call() {
     pipeline {
         agent any
         environment {
-            SKIP_SCAN = 'false'
+            SKIP_SCAN = "false"
         }
         stages {
             stage('Exception List Check') {
@@ -26,7 +26,7 @@ def call() {
                         def exceptionsYaml = readYaml file: 'exceptions/exceptions.yaml'
                         echo "→ Exceptions loaded: ${exceptionsYaml}"
 
-                        // Get current repo org/name from Git URL
+                        // Get current repo org/name
                         def gitUrl = scm.getUserRemoteConfigs()[0].getUrl()
                         def orgRepo = gitUrl.split('/')[-2..-1].join('/').replaceAll(/\.git$/, '')
                         echo "→ Current org: ${orgRepo.split('/')[0]}, repo: ${orgRepo.split('/')[1]}"
@@ -38,44 +38,24 @@ def call() {
                         } else {
                             env.SKIP_SCAN = "false"
                             echo "→ Repo '${orgRepo}' is NOT in exceptions → running scan"
-                            runScan(orgRepo)
                         }
 
-                        echo "→ SKIP_SCAN = ${env.SKIP_SCAN}"
-                        echo "→ Exception list check finished"
+                        echo "→ Set SKIP_SCAN = ${env.SKIP_SCAN}"
                     }
                 }
             }
 
-            stage('Run Scan') {
-                when {
-                    expression { env.SKIP_SCAN == "false" }
-                }
+            stage('Scan Status') {
                 steps {
                     script {
-                        echo "→ Scan executed 🚀 (SKIP_SCAN=${env.SKIP_SCAN})"
-                        runScan("dummy") // replace "dummy" with actual orgRepo if needed
+                        if (env.SKIP_SCAN == "true") {
+                            echo "→ Scan skipped ❌ (SKIP_SCAN=${env.SKIP_SCAN})"
+                        } else {
+                            echo "→ Scan executed 🚀 (SKIP_SCAN=${env.SKIP_SCAN})"
+                        }
                     }
-                }
-            }
-
-            stage('Skip Notice') {
-                when {
-                    expression { env.SKIP_SCAN == "true" }
-                }
-                steps {
-                    echo "→ Scan skipped ❌ (SKIP_SCAN=${env.SKIP_SCAN})"
                 }
             }
         }
-    }
-}
-
-def runScan(orgRepo) {
-    echo "Running scan for repo: ${orgRepo}"
-    if (isUnix()) {
-        sh "echo Scan logic goes here for ${orgRepo}"
-    } else {
-        bat "echo Scan logic goes here for ${orgRepo}"
     }
 }
