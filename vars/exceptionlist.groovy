@@ -3,7 +3,6 @@ def call() {
         agent any
         environment {
             SKIP_SCAN = 'false'
-            RUN_SCAN  = 'false'
         }
         stages {
             stage('Exception List Check') {
@@ -35,18 +34,15 @@ def call() {
                         // Check exceptions
                         if (exceptionsYaml.exceptions.contains(orgRepo)) {
                             env.SKIP_SCAN = 'true'
-                            env.RUN_SCAN  = 'false'
                             echo "→ Repo '${orgRepo}' is in exceptions → skipping scan"
                         } else {
                             env.SKIP_SCAN = 'false'
-                            env.RUN_SCAN  = 'true'
                             echo "→ Repo '${orgRepo}' is NOT in exceptions → running scan"
                             runScan(orgRepo)
                         }
 
-                        // Print environment flags
+                        // Print environment flag
                         echo "→ SKIP_SCAN = ${env.SKIP_SCAN}"
-                        echo "→ RUN_SCAN  = ${env.RUN_SCAN}"
 
                         echo "→ Exception list check finished"
                     }
