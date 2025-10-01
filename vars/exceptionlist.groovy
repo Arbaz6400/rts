@@ -41,10 +41,20 @@ def call() {
                             runScan(orgRepo)
                         }
 
-                        // Print environment flag
                         echo "→ SKIP_SCAN = ${env.SKIP_SCAN}"
-
                         echo "→ Exception list check finished"
+                    }
+                }
+            }
+
+            stage('Scan Status') {
+                steps {
+                    script {
+                        if (env.SKIP_SCAN == 'true') {
+                            echo "→ Scan skipped ✅ (SKIP_SCAN=${env.SKIP_SCAN})"
+                        } else {
+                            echo "→ Scan executed 🚀 (SKIP_SCAN=${env.SKIP_SCAN})"
+                        }
                     }
                 }
             }
