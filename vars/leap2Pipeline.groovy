@@ -222,9 +222,7 @@
 //         }
 //     }
 // }
-
-
-def call(Map params = [:]) {
+def call() {
     pipeline {
         agent any
 
@@ -234,10 +232,10 @@ def call(Map params = [:]) {
 
         stages {
 
-            stage('Fetch Root Directories') {
+            stage('Update Parameters') {
                 steps {
                     script {
-                        // List all folders in the repo root (Windows)
+                        // Windows-safe directory listing
                         def raw = bat(
                             script: '''
                             @echo off
@@ -246,7 +244,7 @@ def call(Map params = [:]) {
                             returnStdout: true
                         ).trim()
 
-                        // Filter out non-folders or unwanted dirs (like .git)
+                        // Filter to only actual directories in root
                         def dirs = raw
                             .split("\\r?\\n")
                             .collect { it.trim() }
@@ -259,10 +257,7 @@ def call(Map params = [:]) {
 
                         echo "Found directories: ${dirs.join(', ')}"
 
-                        // Pick first folder automatically if no parameter is set
-                        env.SELECTED_DIR = params.SELECTED_DIR ?: dirs[0]
-
-                        // Update choice parameter dynamically for future runs
+                        // Update the choice parameter dynamically
                         properties([
                             parameters([
                                 choice(
@@ -279,8 +274,11 @@ def call(Map params = [:]) {
             stage('Proceed') {
                 steps {
                     script {
-                        echo "Processing directory: ${env.SELECTED_DIR}"
-                        // Your build/deploy logic goes here
+                        if (!params.SELECTED_DIR) {
+                            error "No directory selected! Please choose one from the parameter."
+                        }
+                        echo "Processing directory: ${params.SELECTED_DIR}"
+                        // Your build/deploy logic here
                     }
                 }
             }
@@ -288,4 +286,5 @@ def call(Map params = [:]) {
         }
     }
 }
+
 
