@@ -1,85 +1,92 @@
 
-
-
 // def call() {
-
 //     pipeline {
 //         agent any
 
 //         environment {
-//             SELECTED_DIR = ''
+//             SELECTED_DIRECTORY = ''
 //         }
 
 //         stages {
 
 //             stage('Fetch Root Directories') {
+//                 steps {
+//                     script {
+//                         // Windows-safe directory listing
+//                         def raw = bat(
+//                             script: '''
+//                             @echo off
+//                             for /d %%i in (*) do echo %%i
+//                             ''',
+//                             returnStdout: true
+//                         ).trim()
+
+//                         if (!raw) {
+//                             error "No directories found in repo root"
+//                         }
+
+//                         // Filter and sort directories
+//                         def dirs = raw
+//                             .split("\\r?\\n")
+//                             .collect { it.trim() }
+//                             .findAll { it && it != '.git' }
+//                             .sort()
+
+//                         if (dirs.isEmpty()) {
+//                             error "No valid directories found in repo root"
+//                         }
+
+//                         echo "Found directories: ${dirs.join(', ')}"
+
+//                         // Save dirs in env for next stage
+//                         env.DIRS_LIST = dirs.join('\n')
+//                     }
+//                 }
+//             }
+
+//   stage('Select Directory') {
 //     steps {
 //         script {
-//             def output = bat(
-//                 script: '''
-//                 for /d %%i in (*) do @echo %%i
-//                 ''',
-//                 returnStdout: true
-//             ).trim()
+//             // Example directories list
+//             def dirs = ['exceptions', 'scripts', 'scripts2']
 
-//             if (!output) {
-//                 error "No directories found in repo root"
-//             }
+//             // input returns either string or map
+//             def userInput = input(
+//                 message: 'Select directory to proceed',
+//                 ok: 'Continue',
+//                 parameters: [
+//                     choice(
+//                         name: 'DIRECTORY',
+//                         choices: dirs.join('\n'),
+//                         description: 'Root directory'
+//                     )
+//                 ]
+//             )
 
-//             def dirs = output
-//                 .split("\\r?\\n")
-//                 .collect { it.trim() }
-//                 .findAll { it && it != '.git' }
-//                 .sort()
+//             // Capture the selected directory properly
+//             def selectedDir = (userInput instanceof Map) ? userInput['DIRECTORY'] : userInput
+//             echo "Selected directory: ${selectedDir}"
 
-//             if (dirs.isEmpty()) {
-//                 error "No valid directories found in repo root"
-//             }
-
-//             binding.LEAP2_DIRS = dirs
-//             echo "Found directories: ${dirs.join(', ')}"
+//             // Save to environment for later stages
+//             env.SELECTED_DIRECTORY = selectedDir
 //         }
 //     }
 // }
 
 
-
-//             stage('Select Directory') {
-//                 steps {
-//                     script {
-//                         def choiceMap = input(
-//                             message: 'Select Leap2 directory',
-//                             ok: 'Proceed',
-//                             parameters: [
-//                                 choice(
-//                                     name: 'DIRECTORY',
-//                                     choices: binding.LEAP2_DIRS.join('\n'),
-//                                     description: 'Directories from Leap2 repo root'
-//                                 )
-//                             ]
-//                         )
-
-//                         // input returns Map
-//                         env.SELECTED_DIR = choiceMap['DIRECTORY']
-//                         echo "Selected directory: ${env.SELECTED_DIR}"
-//                     }
-//                 }
-//             }
-
 //             stage('Validate Selection') {
 //                 steps {
 //                     script {
-//                         if (!fileExists(env.SELECTED_DIR)) {
-//                             error "Selected directory does not exist: ${env.SELECTED_DIR}"
+//                         if (!env.SELECTED_DIRECTORY) {
+//                             error "No directory selected"
 //                         }
-//                         echo "Validated directory: ${env.SELECTED_DIR}"
 //                     }
 //                 }
 //             }
 
 //             stage('Proceed') {
 //                 steps {
-//                     echo "Proceeding with directory: ${env.SELECTED_DIR}"
+//                     echo "Proceeding with directory: ${env.SELECTED_DIRECTORY}"
 //                 }
 //             }
 //         }
@@ -87,95 +94,51 @@
 // }
 
 
+def selectedDir = null  // define outside stages
 
-def call() {
-    pipeline {
-        agent any
-
-        environment {
-            SELECTED_DIRECTORY = ''
-        }
-
-        stages {
-
-            stage('Fetch Root Directories') {
-                steps {
-                    script {
-                        // Windows-safe directory listing
-                        def raw = bat(
-                            script: '''
-                            @echo off
-                            for /d %%i in (*) do echo %%i
-                            ''',
-                            returnStdout: true
-                        ).trim()
-
-                        if (!raw) {
-                            error "No directories found in repo root"
-                        }
-
-                        // Filter and sort directories
-                        def dirs = raw
-                            .split("\\r?\\n")
-                            .collect { it.trim() }
-                            .findAll { it && it != '.git' }
-                            .sort()
-
-                        if (dirs.isEmpty()) {
-                            error "No valid directories found in repo root"
-                        }
-
-                        echo "Found directories: ${dirs.join(', ')}"
-
-                        // Save dirs in env for next stage
-                        env.DIRS_LIST = dirs.join('\n')
-                    }
+pipeline {
+    agent any
+    stages {
+        stage('Fetch Root Directories') {
+            steps {
+                script {
+                    def dirs = ['exceptions', 'scripts', 'scripts2']
+                    echo "Found directories: ${dirs.join(', ')}"
                 }
             }
-
-  stage('Select Directory') {
-    steps {
-        script {
-            // Example directories list
-            def dirs = ['exceptions', 'scripts', 'scripts2']
-
-            // input returns either string or map
-            def userInput = input(
-                message: 'Select directory to proceed',
-                ok: 'Continue',
-                parameters: [
-                    choice(
-                        name: 'DIRECTORY',
-                        choices: dirs.join('\n'),
-                        description: 'Root directory'
+        }
+        stage('Select Directory') {
+            steps {
+                script {
+                    def dirs = ['exceptions', 'scripts', 'scripts2']
+                    def userInput = input(
+                        message: 'Select directory to proceed',
+                        ok: 'Continue',
+                        parameters: [
+                            choice(name: 'DIRECTORY', choices: dirs.join('\n'), description: 'Root directory')
+                        ]
                     )
-                ]
-            )
-
-            // Capture the selected directory properly
-            def selectedDir = (userInput instanceof Map) ? userInput['DIRECTORY'] : userInput
-            echo "Selected directory: ${selectedDir}"
-
-            // Save to environment for later stages
-            env.SELECTED_DIRECTORY = selectedDir
+                    // Capture input properly
+                    selectedDir = (userInput instanceof Map) ? userInput['DIRECTORY'] : userInput
+                    echo "Selected directory: ${selectedDir}"
+                }
+            }
         }
-    }
-}
-
-
-            stage('Validate Selection') {
-                steps {
-                    script {
-                        if (!env.SELECTED_DIRECTORY) {
-                            error "No directory selected"
-                        }
+        stage('Validate Selection') {
+            steps {
+                script {
+                    if (!selectedDir) {
+                        error "No directory selected"
+                    } else {
+                        echo "Directory validated: ${selectedDir}"
                     }
                 }
             }
-
-            stage('Proceed') {
-                steps {
-                    echo "Proceeding with directory: ${env.SELECTED_DIRECTORY}"
+        }
+        stage('Proceed') {
+            steps {
+                script {
+                    echo "Proceeding with ${selectedDir}"
                 }
             }
         }
