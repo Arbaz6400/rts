@@ -204,7 +204,7 @@ def call(Map params = [:]) {
                         echo "Found directories: ${dirs.join(', ')}"
 
                         // Save dirs in env for next stage
-                        env.DIRS_LIST = dirs.join('\n')
+            env.ROOT_DIRS = dirs.join(',')
                     }
                 }
             }
