@@ -89,13 +89,25 @@ def call() {
             stage('Fetch Root Directories') {
     steps {
         script {
-            def dirs = findFiles(glob: '*', directory: true)
-                .collect { it.name }
-                .findAll { it != '.git' }
+            def output = bat(
+                script: '''
+                for /d %%i in (*) do @echo %%i
+                ''',
+                returnStdout: true
+            ).trim()
+
+            if (!output) {
+                error "No directories found in repo root"
+            }
+
+            def dirs = output
+                .split("\\r?\\n")
+                .collect { it.trim() }
+                .findAll { it && it != '.git' }
                 .sort()
 
-            if (!dirs || dirs.isEmpty()) {
-                error "No directories found in repo root"
+            if (dirs.isEmpty()) {
+                error "No valid directories found in repo root"
             }
 
             binding.LEAP2_DIRS = dirs
@@ -103,6 +115,7 @@ def call() {
         }
     }
 }
+
 
 
             stage('Select Directory') {
