@@ -1,92 +1,74 @@
 def call() {
 
-pipeline {
-    agent any
+    pipeline {
+        agent any
 
-    parameters {
-        string(
-            name: 'LEAP2_DIR',
-            defaultValue: '',
-            description: 'Enter root folder name from Leap2 repo'
-        )
-    }
-
-    environment {
-        LEAP2_REPO   = 'https://github.com/Leap-stream/Leap2.git'
-        LEAP2_BRANCH = 'main'
-    }
-
-    stages {
-
-        stage('Fetch Leap2 Directories') {
-            steps {
-                script {
-                    def tmp = "leap2-${UUID.randomUUID()}"
-
-                    sh """
-                      rm -rf ${tmp}
-                      git clone --depth 1 -b ${LEAP2_BRANCH} ${LEAP2_REPO} ${tmp}
-                    """
-
-                    def dirs = sh(
-                        script: "ls -d ${tmp}/*/ 2>/dev/null | xargs -n 1 basename",
-                        returnStdout: true
-                    ).trim()
-
-                    sh "rm -rf ${tmp}"
-
-                    if (!dirs) {
-                        error("No directories found in Leap2 repo")
-                    }
-
-                    env.AVAILABLE_DIRS = dirs
-                    echo "Available Leap2 directories:\n${dirs}"
-                }
-            }
+        environment {
+            LEAP2_DIRS = ''
+            SELECTED_DIR = ''
         }
 
-        stage('Select Directory (First Run)') {
-            when {
-                expression { params.LEAP2_DIR.trim() == '' }
-            }
-            steps {
-                error """
-No LEAP2_DIR selected.
+        stages {
 
-Available directories:
-${env.AVAILABLE_DIRS}
+            stage('Fetch Root Directories') {
+                steps {
+                    script {
+                        def root = new File(pwd())
+                        def dirs = root.listFiles()
+                                      .findAll { it.isDirectory() }
+                                      .collect { it.name }
+                                      .sort()
 
-Re-run the job with LEAP2_DIR set.
-"""
-            }
-        }
+                        if (!dirs || dirs.isEmpty()) {
+                            error "No directories found in repo root"
+                        }
 
-        stage('Validate Selection') {
-            steps {
-                script {
-                    def validDirs = env.AVAILABLE_DIRS.split('\n')
-
-                    if (!validDirs.contains(params.LEAP2_DIR)) {
-                        error """
-Invalid directory: ${params.LEAP2_DIR}
-
-Valid options:
-${validDirs.join('\n')}
-"""
+                        env.LEAP2_DIRS = dirs.join(',')
+                        echo "Found directories: ${env.LEAP2_DIRS}"
                     }
                 }
             }
-        }
 
-        stage('Proceed') {
-            steps {
-                echo "✅ Proceeding with Leap2 directory: ${params.LEAP2_DIR}"
+            stage('Select Directory (First Run Only)') {
+                when {
+                    expression { !env.SELECTED_DIR?.trim() }
+                }
+                steps {
+                    script {
+                        def choice = input(
+                            message: 'Select Leap2 directory',
+                            ok: 'Proceed',
+                            parameters: [
+                                choice(
+                                    name: 'SELECTED_DIR',
+                                    choices: env.LEAP2_DIRS.split(',').join('\n'),
+                                    description: 'Directories from Leap2 repo root'
+                                )
+                            ]
+                        )
 
-                script {
-                    currentBuild.description = "Leap2: ${params.LEAP2_DIR}"
+                        env.SELECTED_DIR = choice
+                    }
+                }
+            }
+
+            stage('Validate Selection') {
+                steps {
+                    script {
+                        def selectedPath = new File("${pwd()}/${env.SELECTED_DIR}")
+                        if (!selectedPath.exists()) {
+                            error "Selected directory does not exist: ${env.SELECTED_DIR}"
+                        }
+                        echo "Validated directory: ${env.SELECTED_DIR}"
+                    }
+                }
+            }
+
+            stage('Proceed') {
+                steps {
+                    echo "Proceeding with directory: ${env.SELECTED_DIR}"
                 }
             }
         }
     }
-}
 }
