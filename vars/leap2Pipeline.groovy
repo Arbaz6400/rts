@@ -162,6 +162,68 @@
 // }
 
 
+// def call(Map params = [:]) {
+//     pipeline {
+//         agent any
+
+//         environment {
+//             WORKSPACE_DIR = "${env.WORKSPACE}"
+//         }
+
+//         stages {
+//             stage('Fetch Root Directories') {
+//                 steps {
+//                     script {
+//                         def raw = bat(
+//                             script: '''
+//                             @echo off
+//                             for /d %%i in (*) do echo %%i
+//                             ''',
+//                             returnStdout: true
+//                         ).trim()
+
+//                         def dirs = raw
+//                             .split("\\r?\\n")
+//                             .collect { it.trim() }
+//                             .findAll { it && it != '.git' }
+//                             .sort()
+
+//                         if (dirs.isEmpty()) {
+//                             error "No valid directories found in repo root"
+//                         }
+
+//                         echo "Found directories: ${dirs.join(', ')}"
+
+//                         // Automatically pick the first directory as default
+//                         env.SELECTED_DIR = dirs[0]
+
+//                         // Optional: update parameters for UI display in future runs
+//                         properties([
+//                             parameters([
+//                                 choice(
+//                                     name: 'SELECTED_DIR',
+//                                     choices: dirs.join('\n'),
+//                                     description: 'Select directory to build'
+//                                 )
+//                             ])
+//                         ])
+//                     }
+//                 }
+//             }
+
+//             stage('Proceed') {
+//                 steps {
+//                     script {
+//                         echo "Processing directory: ${env.SELECTED_DIR}"
+//                         // Build/deploy steps here
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
+
+
 def call(Map params = [:]) {
     pipeline {
         agent any
@@ -171,9 +233,11 @@ def call(Map params = [:]) {
         }
 
         stages {
+
             stage('Fetch Root Directories') {
                 steps {
                     script {
+                        // List all folders in the repo root (Windows)
                         def raw = bat(
                             script: '''
                             @echo off
@@ -182,10 +246,11 @@ def call(Map params = [:]) {
                             returnStdout: true
                         ).trim()
 
+                        // Filter out non-folders or unwanted dirs (like .git)
                         def dirs = raw
                             .split("\\r?\\n")
                             .collect { it.trim() }
-                            .findAll { it && it != '.git' }
+                            .findAll { it && new File("${env.WORKSPACE}\\${it}").isDirectory() && it != '.git' }
                             .sort()
 
                         if (dirs.isEmpty()) {
@@ -194,16 +259,16 @@ def call(Map params = [:]) {
 
                         echo "Found directories: ${dirs.join(', ')}"
 
-                        // Automatically pick the first directory as default
-                        env.SELECTED_DIR = dirs[0]
+                        // Pick first folder automatically if no parameter is set
+                        env.SELECTED_DIR = params.SELECTED_DIR ?: dirs[0]
 
-                        // Optional: update parameters for UI display in future runs
+                        // Update choice parameter dynamically for future runs
                         properties([
                             parameters([
                                 choice(
                                     name: 'SELECTED_DIR',
                                     choices: dirs.join('\n'),
-                                    description: 'Select directory to build'
+                                    description: 'Select a directory to build'
                                 )
                             ])
                         ])
@@ -215,10 +280,11 @@ def call(Map params = [:]) {
                 steps {
                     script {
                         echo "Processing directory: ${env.SELECTED_DIR}"
-                        // Build/deploy steps here
+                        // Your build/deploy logic goes here
                     }
                 }
             }
+
         }
     }
 }
