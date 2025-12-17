@@ -224,54 +224,54 @@
 // }
 
 
-// def call() {
-//     pipeline {
-//         agent any
+def call() {
+    pipeline {
+        agent any
 
-//         environment {
-//             WORKSPACE_DIR = "${env.WORKSPACE}"
-//         }
+        environment {
+            WORKSPACE_DIR = "${env.WORKSPACE}"
+        }
 
-//         stages {
+        stages {
 
-//             // stage('Update Parameters') {
-//             //     steps {
-//             //         script {
-//             //             // Windows-safe directory listing
-//             //             def raw = bat(
-//             //                 script: '''
-//             //                 @echo off
-//             //                 for /d %%i in (*) do echo %%i
-//             //                 ''',
-//             //                 returnStdout: true
-//             //             ).trim()
+            stage('Update Parameters') {
+                steps {
+                    script {
+                        // Windows-safe directory listing
+                        def raw = bat(
+                            script: '''
+                            @echo off
+                            for /d %%i in (*) do echo %%i
+                            ''',
+                            returnStdout: true
+                        ).trim()
 
-//             //             // Filter to only actual directories in root
-//             //             def dirs = raw
-//             //                 .split("\\r?\\n")
-//             //                 .collect { it.trim() }
-//             //                 .findAll { it && new File("${env.WORKSPACE}\\${it}").isDirectory() && it != '.git' }
-//             //                 .sort()
+                        // Filter to only actual directories in root
+                        def dirs = raw
+                            .split("\\r?\\n")
+                            .collect { it.trim() }
+                            .findAll { it && new File("${env.WORKSPACE}\\${it}").isDirectory() && it != '.git' }
+                            .sort()
 
-//             //             if (dirs.isEmpty()) {
-//             //                 error "No valid directories found in repo root"
-//             //             }
+                        if (dirs.isEmpty()) {
+                            error "No valid directories found in repo root"
+                        }
 
-//             //             echo "Found directories: ${dirs.join(', ')}"
+                        echo "Found directories: ${dirs.join(', ')}"
 
-//             //             // Update the choice parameter dynamically
-//             //             properties([
-//             //                 parameters([
-//             //                     choice(
-//             //                         name: 'SELECTED_DIR',
-//             //                         choices: dirs.join('\n'),
-//             //                         description: 'Select a directory to build'
-//             //                     )
-//             //                 ])
-//             //             ])
-//             //         }
-//             //     }
-//             // }
+                        // Update the choice parameter dynamically
+                        properties([
+                            parameters([
+                                choice(
+                                    name: 'SELECTED_DIR',
+                                    choices: dirs.join('\n'),
+                                    description: 'Select a directory to build'
+                                )
+                            ])
+                        ])
+                    }
+                }
+            }
 //                     stage('Update Parameters') {
 //     steps {
 //         script {
@@ -311,78 +311,22 @@
 // }
 
 
-//             stage('Proceed') {
-//                 steps {
-//                     script {
-//                         if (!params.SELECTED_DIR) {
-//                             error "No directory selected! Please choose one from the parameter."
-//                         }
-//                         echo "Processing directory: ${params.SELECTED_DIR}"
-//                         // Your build/deploy logic here
-//                     }
-//                 }
-//             }
-
-//         }
-//     }
-// }
-
-
-pipeline {
-    agent any
-
-    stages {
-        stage('Checkout Code') {
-            steps {
-                // Clean workspace
-                deleteDir()
-                
-                // Checkout SCM
-                checkout scm
-            }
-        }
-
-        stage('Update Choice Parameter') {
-            steps {
-                script {
-                    // Scan only directories in repo root
-                    def dirs = []
-                    new File(env.WORKSPACE).eachDir { d ->
-                        if (!d.name.startsWith('.') && d.isDirectory()) {
-                            dirs << d.name
+            stage('Proceed') {
+                steps {
+                    script {
+                        if (!params.SELECTED_DIR) {
+                            error "No directory selected! Please choose one from the parameter."
                         }
+                        echo "Processing directory: ${params.SELECTED_DIR}"
+                        // Your build/deploy logic here
                     }
-
-                    if (dirs.isEmpty()) {
-                        error "No valid directories found in repo root"
-                    }
-
-                    dirs.sort()
-                    echo "Found directories: ${dirs.join(', ')}"
-
-                    // Update choice parameter dynamically
-                    properties([
-                        parameters([
-                            choice(
-                                name: 'SELECTED_DIR',
-                                choices: dirs.join('\n'),
-                                description: 'Select a directory to build'
-                            )
-                        ])
-                    ])
                 }
             }
-        }
 
-        stage('Proceed') {
-            steps {
-                script {
-                    echo "Processing directory: ${params.SELECTED_DIR}"
-                    // Add your build/deploy steps here
-                }
-            }
         }
     }
 }
+
+  
 
 
