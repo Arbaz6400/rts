@@ -157,22 +157,41 @@ def call(Map params = [:]) {
         }
 
         stages {
+//             stage('Fetch Root Directories') {
+//     steps {
+//         script {
+//             // List directories in the repo root
+//             def dirs = findFiles(glob: '*', type: 'DIRECTORY').collect { it.name }
+//             echo "Found directories: ${dirs.join(', ')}"
+
+//             if (dirs.isEmpty()) {
+//                 error "No directories found in repo root!"
+//             }
+
+//             // Save for later input selection
+//             env.ROOT_DIRS = dirs.join(',')
+//         }
+//     }
+// }
             stage('Fetch Root Directories') {
     steps {
         script {
-            // List directories in the repo root
-            def dirs = findFiles(glob: '*', type: 'DIRECTORY').collect { it.name }
+            // On Windows
+            def dirs = bat(returnStdout: true, script: 'for /d %i in (*) do @echo %i').trim().split("\r\n")
+            // On Linux/macOS, use:
+            // def dirs = sh(returnStdout: true, script: 'find . -maxdepth 1 -type d -not -name "." | sed "s|./||"').trim().split("\n")
+
             echo "Found directories: ${dirs.join(', ')}"
 
-            if (dirs.isEmpty()) {
-                error "No directories found in repo root!"
+            if (!dirs) {
+                error "No directories found!"
             }
 
-            // Save for later input selection
             env.ROOT_DIRS = dirs.join(',')
         }
     }
 }
+
 
 
             stage('Select Directory') {
