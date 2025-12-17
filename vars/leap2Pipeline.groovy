@@ -173,26 +173,41 @@ def call(Map params = [:]) {
 //         }
 //     }
 // }
+
             stage('Fetch Root Directories') {
-    steps {
-        script {
-            // On Windows
-            def dirs = bat(returnStdout: true, script: 'for /d %i in (*) do @echo %i').trim().split("\r\n")
-            // On Linux/macOS, use:
-            // def dirs = sh(returnStdout: true, script: 'find . -maxdepth 1 -type d -not -name "." | sed "s|./||"').trim().split("\n")
+                steps {
+                    script {
+                        // Windows-safe directory listing
+                        def raw = bat(
+                            script: '''
+                            @echo off
+                            for /d %%i in (*) do echo %%i
+                            ''',
+                            returnStdout: true
+                        ).trim()
 
-            echo "Found directories: ${dirs.join(', ')}"
+                        if (!raw) {
+                            error "No directories found in repo root"
+                        }
 
-            if (!dirs) {
-                error "No directories found!"
+                        // Filter and sort directories
+                        def dirs = raw
+                            .split("\\r?\\n")
+                            .collect { it.trim() }
+                            .findAll { it && it != '.git' }
+                            .sort()
+
+                        if (dirs.isEmpty()) {
+                            error "No valid directories found in repo root"
+                        }
+
+                        echo "Found directories: ${dirs.join(', ')}"
+
+                        // Save dirs in env for next stage
+                        env.DIRS_LIST = dirs.join('\n')
+                    }
+                }
             }
-
-            env.ROOT_DIRS = dirs.join(',')
-        }
-    }
-}
-
-
 
             stage('Select Directory') {
     steps {
