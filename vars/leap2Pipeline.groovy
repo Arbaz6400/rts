@@ -158,37 +158,43 @@ def call(Map params = [:]) {
 
         stages {
             stage('Fetch Root Directories') {
-                steps {
-                    script {
-                        // List directories in repo root
-                        def dirs = []
-                        dir("${env.WORKSPACE}") {
-                            dirs = findFiles(glob: '*').findAll { it.directory }.collect { it.name }
-                        }
-                        echo "Found directories: ${dirs.join(', ')}"
+    steps {
+        script {
+            // List directories in the repo root
+            def dirs = findFiles(glob: '*', type: 'DIRECTORY').collect { it.name }
+            echo "Found directories: ${dirs.join(', ')}"
 
-                        // Save to a variable for later stages
-                        env.ROOT_DIRS = dirs.join(',')
-                    }
-                }
+            if (dirs.isEmpty()) {
+                error "No directories found in repo root!"
             }
+
+            // Save for later input selection
+            env.ROOT_DIRS = dirs.join(',')
+        }
+    }
+}
+
 
             stage('Select Directory') {
-                steps {
-                    script {
-                        // Ask user to select directory
-                        def selected = input(
-                            message: 'Select a directory to proceed',
-                            parameters: [
-                                choice(name: 'DIRECTORY', choices: env.ROOT_DIRS.tokenize(',').join('\n'), description: 'Choose one')
-                            ]
-                        )
-                        echo "Selected directory: ${selected}"
-                        env.SELECTED_DIR = selected
-                    }
-                }
-            }
+    steps {
+        script {
+            def selected = input(
+                message: 'Select a directory to proceed',
+                parameters: [
+                    choice(
+                        name: 'DIRECTORY',
+                        choices: env.ROOT_DIRS.tokenize(',').join('\n'),
+                        description: 'Choose one'
+                    )
+                ]
+            )
+            echo "Selected directory: ${selected}"
+            env.SELECTED_DIR = selected
+        }
+    }
+}
 
+            
             stage('Validate Selection') {
                 steps {
                     script {
