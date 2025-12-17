@@ -12,7 +12,7 @@ pipeline {
     }
 
     environment {
-        LEAP2_REPO = 'https://github.com/Leap-stream/Leap2.git'
+        LEAP2_REPO   = 'https://github.com/Leap-stream/Leap2.git'
         LEAP2_BRANCH = 'main'
     }
 
@@ -55,7 +55,7 @@ No LEAP2_DIR selected.
 
 Available directories:
 ${env.AVAILABLE_DIRS}
-                
+
 Re-run the job with LEAP2_DIR set.
 """
             }
@@ -81,7 +81,10 @@ ${validDirs.join('\n')}
         stage('Proceed') {
             steps {
                 echo "✅ Proceeding with Leap2 directory: ${params.LEAP2_DIR}"
-                currentBuild.description = "Leap2: ${params.LEAP2_DIR}"
+
+                script {
+                    currentBuild.description = "Leap2: ${params.LEAP2_DIR}"
+                }
             }
         }
     }
