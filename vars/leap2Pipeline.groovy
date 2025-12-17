@@ -4,7 +4,6 @@ def call() {
         agent any
 
         environment {
-            LEAP2_DIRS = ''
             SELECTED_DIR = ''
         }
 
@@ -13,18 +12,21 @@ def call() {
             stage('Fetch Root Directories') {
                 steps {
                     script {
-                        def root = new File(pwd())
-                        def dirs = root.listFiles()
-                                      .findAll { it.isDirectory() }
-                                      .collect { it.name }
-                                      .sort()
+                        def ws = pwd()
+                        def dirs = []
 
-                        if (!dirs || dirs.isEmpty()) {
-                            error "No directories found in repo root"
+                        new File(ws).eachDir { d ->
+                            dirs << d.name
                         }
 
-                        env.LEAP2_DIRS = dirs.join(',')
-                        echo "Found directories: ${env.LEAP2_DIRS}"
+                        if (dirs.isEmpty()) {
+                            error "No directories found in repo root: ${ws}"
+                        }
+
+                        // keep in local variable via binding
+                        binding.setVariable('LEAP2_DIR_LIST', dirs.sort())
+
+                        echo "Found directories: ${dirs.join(', ')}"
                     }
                 }
             }
@@ -35,19 +37,19 @@ def call() {
                 }
                 steps {
                     script {
-                        def choice = input(
+                        def dirs = binding.getVariable('LEAP2_DIR_LIST')
+
+                        env.SELECTED_DIR = input(
                             message: 'Select Leap2 directory',
                             ok: 'Proceed',
                             parameters: [
                                 choice(
-                                    name: 'SELECTED_DIR',
-                                    choices: env.LEAP2_DIRS.split(',').join('\n'),
+                                    name: 'DIRECTORY',
+                                    choices: dirs.join('\n'),
                                     description: 'Directories from Leap2 repo root'
                                 )
                             ]
                         )
-
-                        env.SELECTED_DIR = choice
                     }
                 }
             }
