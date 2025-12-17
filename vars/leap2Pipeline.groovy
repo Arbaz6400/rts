@@ -89,67 +89,88 @@
 
 
 def call() {
+    pipeline {
+        agent any
 
-    def dirs = []
+        environment {
+            SELECTED_DIRECTORY = ''
+        }
 
-    stage('Fetch Root Directories') {
-        script {
-            def raw = bat(
-                script: '''
-                @echo off
-                for /d %%i in (*) do echo %%i
-                ''',
-                returnStdout: true
-            ).trim()
+        stages {
 
-            if (!raw) {
-                error "No directories found in repo root"
+            stage('Fetch Root Directories') {
+                steps {
+                    script {
+                        // Windows-safe directory listing
+                        def raw = bat(
+                            script: '''
+                            @echo off
+                            for /d %%i in (*) do echo %%i
+                            ''',
+                            returnStdout: true
+                        ).trim()
+
+                        if (!raw) {
+                            error "No directories found in repo root"
+                        }
+
+                        // Filter and sort directories
+                        def dirs = raw
+                            .split("\\r?\\n")
+                            .collect { it.trim() }
+                            .findAll { it && it != '.git' }
+                            .sort()
+
+                        if (dirs.isEmpty()) {
+                            error "No valid directories found in repo root"
+                        }
+
+                        echo "Found directories: ${dirs.join(', ')}"
+
+                        // Save dirs in env for next stage
+                        env.DIRS_LIST = dirs.join('\n')
+                    }
+                }
             }
 
-            dirs = raw
-                .split("\\r?\\n")
-                .collect { it.trim() }
-                .findAll { it && it != '.git' }
-                .sort()
+            stage('Select Directory') {
+                steps {
+                    script {
+                        def dirs = env.DIRS_LIST.split("\\r?\\n")
 
-            if (dirs.isEmpty()) {
-                error "No valid directories found in repo root"
+                        def userInput = input(
+                            message: 'Select directory to proceed',
+                            ok: 'Continue',
+                            parameters: [
+                                choice(
+                                    name: 'DIRECTORY',
+                                    choices: dirs.join('\n'),
+                                    description: 'Root directory'
+                                )
+                            ]
+                        )
+
+                        env.SELECTED_DIRECTORY = userInput
+                        echo "Selected directory: ${env.SELECTED_DIRECTORY}"
+                    }
+                }
             }
 
-            echo "Found directories: ${dirs.join(', ')}"
-        }
-    }
+            stage('Validate Selection') {
+                steps {
+                    script {
+                        if (!env.SELECTED_DIRECTORY) {
+                            error "No directory selected"
+                        }
+                    }
+                }
+            }
 
-    stage('Select Directory') {
-        script {
-            def userInput = input(
-                message: 'Select directory to proceed',
-                ok: 'Continue',
-                parameters: [
-                    choice(
-                        name: 'DIRECTORY',
-                        choices: dirs.join('\n'),
-                        description: 'Root directory'
-                    )
-                ]
-            )
-
-            // ✅ input returns a MAP
-            env.SELECTED_DIRECTORY = userInput['DIRECTORY']
-            echo "Selected directory: ${env.SELECTED_DIRECTORY}"
-        }
-    }
-
-    stage('Validate Selection') {
-        script {
-            if (!env.SELECTED_DIRECTORY) {
-                error "No directory selected"
+            stage('Proceed') {
+                steps {
+                    echo "Proceeding with directory: ${env.SELECTED_DIRECTORY}"
+                }
             }
         }
-    }
-
-    stage('Proceed') {
-        echo "Proceeding with directory: ${env.SELECTED_DIRECTORY}"
-        // your logic here
     }
 }
