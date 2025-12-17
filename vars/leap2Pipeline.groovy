@@ -232,44 +232,82 @@ def call() {
 
         stages {
 
-            stage('Update Parameters') {
-                steps {
-                    script {
-                        // Windows-safe directory listing
-                        def raw = bat(
-                            script: '''
-                            @echo off
-                            for /d %%i in (*) do echo %%i
-                            ''',
-                            returnStdout: true
-                        ).trim()
+            // stage('Update Parameters') {
+            //     steps {
+            //         script {
+            //             // Windows-safe directory listing
+            //             def raw = bat(
+            //                 script: '''
+            //                 @echo off
+            //                 for /d %%i in (*) do echo %%i
+            //                 ''',
+            //                 returnStdout: true
+            //             ).trim()
 
-                        // Filter to only actual directories in root
-                        def dirs = raw
-                            .split("\\r?\\n")
-                            .collect { it.trim() }
-                            .findAll { it && new File("${env.WORKSPACE}\\${it}").isDirectory() && it != '.git' }
-                            .sort()
+            //             // Filter to only actual directories in root
+            //             def dirs = raw
+            //                 .split("\\r?\\n")
+            //                 .collect { it.trim() }
+            //                 .findAll { it && new File("${env.WORKSPACE}\\${it}").isDirectory() && it != '.git' }
+            //                 .sort()
 
-                        if (dirs.isEmpty()) {
-                            error "No valid directories found in repo root"
-                        }
+            //             if (dirs.isEmpty()) {
+            //                 error "No valid directories found in repo root"
+            //             }
 
-                        echo "Found directories: ${dirs.join(', ')}"
+            //             echo "Found directories: ${dirs.join(', ')}"
 
-                        // Update the choice parameter dynamically
-                        properties([
-                            parameters([
-                                choice(
-                                    name: 'SELECTED_DIR',
-                                    choices: dirs.join('\n'),
-                                    description: 'Select a directory to build'
-                                )
-                            ])
-                        ])
-                    }
+            //             // Update the choice parameter dynamically
+            //             properties([
+            //                 parameters([
+            //                     choice(
+            //                         name: 'SELECTED_DIR',
+            //                         choices: dirs.join('\n'),
+            //                         description: 'Select a directory to build'
+            //                     )
+            //                 ])
+            //             ])
+            //         }
+            //     }
+            // }
+                    stage('Update Parameters') {
+    steps {
+        script {
+            // Clean workspace (optional but recommended)
+            deleteDir()
+
+            // Checkout latest code
+            checkout scm
+
+            // List only real directories in repo root
+            def dirs = []
+            new File(env.WORKSPACE).eachDir { d ->
+                if (!d.name.startsWith('.') && d.isDirectory()) {
+                    dirs << d.name
                 }
             }
+
+            if (dirs.isEmpty()) {
+                error "No valid directories found in repo root"
+            }
+
+            dirs.sort()
+            echo "Found directories: ${dirs.join(', ')}"
+
+            // Update choice parameter
+            properties([
+                parameters([
+                    choice(
+                        name: 'SELECTED_DIR',
+                        choices: dirs.join('\n'),
+                        description: 'Select a directory to build'
+                    )
+                ])
+            ])
+        }
+    }
+}
+
 
             stage('Proceed') {
                 steps {
