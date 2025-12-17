@@ -134,27 +134,30 @@ def call() {
             }
 
             stage('Select Directory') {
-                steps {
-                    script {
-                        def dirs = env.DIRS_LIST.split("\\r?\\n")
+    steps {
+        script {
+            def dirs = env.DIRS_LIST.split("\\r?\\n")
 
-                        def userInput = input(
-                            message: 'Select directory to proceed',
-                            ok: 'Continue',
-                            parameters: [
-                                choice(
-                                    name: 'DIRECTORY',
-                                    choices: dirs.join('\n'),
-                                    description: 'Root directory'
-                                )
-                            ]
-                        )
+            // Input returns a Map if multiple parameters, or direct value if single parameter
+            def userInput = input(
+                message: 'Select directory to proceed',
+                ok: 'Continue',
+                parameters: [
+                    choice(
+                        name: 'DIRECTORY',
+                        choices: dirs.join('\n'),
+                        description: 'Root directory'
+                    )
+                ]
+            )
 
-                        env.SELECTED_DIRECTORY = userInput
-                        echo "Selected directory: ${env.SELECTED_DIRECTORY}"
-                    }
-                }
-            }
+            // If input returns a Map, use userInput['DIRECTORY'], else use directly
+            env.SELECTED_DIRECTORY = userInput instanceof Map ? userInput['DIRECTORY'] : userInput
+            echo "Selected directory: ${env.SELECTED_DIRECTORY}"
+        }
+    }
+}
+
 
             stage('Validate Selection') {
                 steps {
