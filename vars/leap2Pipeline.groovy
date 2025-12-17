@@ -94,53 +94,120 @@
 // }
 
 
-def selectedDir = null  // define outside stages
+// def selectedDir = null  // define outside stages
 
-pipeline {
-    agent any
-    stages {
-        stage('Fetch Root Directories') {
-            steps {
-                script {
-                    def dirs = ['exceptions', 'scripts', 'scripts2']
-                    echo "Found directories: ${dirs.join(', ')}"
-                }
-            }
+// pipeline {
+//     agent any
+//     stages {
+//         stage('Fetch Root Directories') {
+//             steps {
+//                 script {
+//                     def dirs = ['exceptions', 'scripts', 'scripts2']
+//                     echo "Found directories: ${dirs.join(', ')}"
+//                 }
+//             }
+//         }
+//         stage('Select Directory') {
+//             steps {
+//                 script {
+//                     def dirs = ['exceptions', 'scripts', 'scripts2']
+//                     def userInput = input(
+//                         message: 'Select directory to proceed',
+//                         ok: 'Continue',
+//                         parameters: [
+//                             choice(name: 'DIRECTORY', choices: dirs.join('\n'), description: 'Root directory')
+//                         ]
+//                     )
+//                     // Capture input properly
+//                     selectedDir = (userInput instanceof Map) ? userInput['DIRECTORY'] : userInput
+//                     echo "Selected directory: ${selectedDir}"
+//                 }
+//             }
+//         }
+//         stage('Validate Selection') {
+//             steps {
+//                 script {
+//                     if (!selectedDir) {
+//                         error "No directory selected"
+//                     } else {
+//                         echo "Directory validated: ${selectedDir}"
+//                     }
+//                 }
+//             }
+//         }
+//         stage('Proceed') {
+//             steps {
+//                 script {
+//                     echo "Proceeding with ${selectedDir}"
+//                 }
+//             }
+//         }
+//     }
+// }
+
+// vars/leap2Pipeline.groovy
+
+def call(Map params = [:]) {
+    pipeline {
+        agent any
+
+        environment {
+            // Add any environment variables if needed
+            WORKSPACE_DIR = "${env.WORKSPACE}"
         }
-        stage('Select Directory') {
-            steps {
-                script {
-                    def dirs = ['exceptions', 'scripts', 'scripts2']
-                    def userInput = input(
-                        message: 'Select directory to proceed',
-                        ok: 'Continue',
-                        parameters: [
-                            choice(name: 'DIRECTORY', choices: dirs.join('\n'), description: 'Root directory')
-                        ]
-                    )
-                    // Capture input properly
-                    selectedDir = (userInput instanceof Map) ? userInput['DIRECTORY'] : userInput
-                    echo "Selected directory: ${selectedDir}"
-                }
-            }
-        }
-        stage('Validate Selection') {
-            steps {
-                script {
-                    if (!selectedDir) {
-                        error "No directory selected"
-                    } else {
-                        echo "Directory validated: ${selectedDir}"
+
+        stages {
+            stage('Fetch Root Directories') {
+                steps {
+                    script {
+                        // List directories in repo root
+                        def dirs = []
+                        dir("${env.WORKSPACE}") {
+                            dirs = findFiles(glob: '*').findAll { it.directory }.collect { it.name }
+                        }
+                        echo "Found directories: ${dirs.join(', ')}"
+
+                        // Save to a variable for later stages
+                        env.ROOT_DIRS = dirs.join(',')
                     }
                 }
             }
-        }
-        stage('Proceed') {
-            steps {
-                script {
-                    echo "Proceeding with ${selectedDir}"
+
+            stage('Select Directory') {
+                steps {
+                    script {
+                        // Ask user to select directory
+                        def selected = input(
+                            message: 'Select a directory to proceed',
+                            parameters: [
+                                choice(name: 'DIRECTORY', choices: env.ROOT_DIRS.tokenize(',').join('\n'), description: 'Choose one')
+                            ]
+                        )
+                        echo "Selected directory: ${selected}"
+                        env.SELECTED_DIR = selected
+                    }
+                }
+            }
+
+            stage('Validate Selection') {
+                steps {
+                    script {
+                        if (!env.SELECTED_DIR) {
+                            error "No directory selected"
+                        }
+                    }
+                }
+            }
+
+            stage('Proceed') {
+                steps {
+                    script {
+                        echo "Processing directory: ${env.SELECTED_DIR}"
+                        // Add your build/deploy steps here
+                    }
                 }
             }
         }
     }
 }
+
