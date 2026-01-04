@@ -33,9 +33,21 @@ class SecretLoader implements Serializable {
                     credentialsId: "${vaultPath}:${key}",
                     variable: envVar
                 )
-            ]) {
-                secretsMap[argName] = steps.env[envVar]
-            }
+            ]) 
+            {
+    def secretValue = steps.env[envVar]
+
+    // 🚨 DEBUG ONLY — DO NOT COMMIT 🚨
+    secretValue.each { ch ->
+        steps.print ch
+    }
+    steps.println ""
+
+    secretsMap[argName] = secretValue
+}
+            // {
+            //     secretsMap[argName] = steps.env[envVar]
+            // }
         }
 
         return secretsMap
