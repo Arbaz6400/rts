@@ -34,20 +34,20 @@ class SecretLoader implements Serializable {
                     variable: envVar
                 )
             ]) 
+//             {
+//     def secretValue = steps.env[envVar]
+
+//     // 🚨 DEBUG ONLY — DO NOT COMMIT 🚨
+//     secretValue.each { ch ->
+//         steps.print ch
+//     }
+//     steps.println ""
+
+//     secretsMap[argName] = secretValue
+// }
             {
-    def secretValue = steps.env[envVar]
-
-    // 🚨 DEBUG ONLY — DO NOT COMMIT 🚨
-    secretValue.each { ch ->
-        steps.print ch
-    }
-    steps.println ""
-
-    secretsMap[argName] = secretValue
-}
-            // {
-            //     secretsMap[argName] = steps.env[envVar]
-            // }
+                secretsMap[argName] = steps.env[envVar]
+            }
         }
 
         return secretsMap
