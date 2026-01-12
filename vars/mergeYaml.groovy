@@ -1,50 +1,51 @@
 def call(Map cfg = [:]) {
 
-pipeline {
-    agent any
+    pipeline {
+        agent any
 
-    stages {
-        stage('Merge YAMLs') {
-            steps {
-                script {
-                    def baseFile     = cfg.base     ?: 'config/base.yaml'
-                    def commonFile   = cfg.common   ?: 'common-job-config.yaml'
-                    def overrideFile = cfg.override ?: 'config/override.yaml'
+        stages {
+            stage('Merge YAMLs') {
+                steps {
+                    script {
+                        def baseFile     = cfg.base     ?: 'config/base.yaml'
+                        def commonFile   = cfg.common   ?: 'common-job-config.yaml'
+                        def overrideFile = cfg.override ?: 'config/override.yaml'
 
-                    [baseFile, commonFile, overrideFile].each { f ->
-                        if (!fileExists(f)) {
-                            error "YAML not found: ${f}"
+                        [baseFile, commonFile, overrideFile].each { f ->
+                            if (!fileExists(f)) {
+                                error "YAML not found: ${f}"
+                            }
                         }
+
+                        def base     = readYaml(file: baseFile)     ?: [:]
+                        def common   = readYaml(file: commonFile)   ?: [:]
+                        def override = readYaml(file: overrideFile) ?: [:]
+
+                        def merged = deepMerge(base, common)
+                        merged = deepMerge(merged, override)
+
+                        writeYaml file: 'merged.yaml',
+                                  data: merged,
+                                  overwrite: true
+
+                        echo "Merged YAML:"
+                        echo readFile('merged.yaml')
                     }
-
-                    def base     = readYaml(file: baseFile)     ?: [:]
-                    def common   = readYaml(file: commonFile)   ?: [:]
-                    def override = readYaml(file: overrideFile) ?: [:]
-
-                    def merged = deepMerge(base, common)
-writeYaml file: 'merged.yaml', data: merged, overwrite: true
-
-                    // // ✅ overwrite safely (no rm needed)
-                    // writeYaml file: 'merged.yaml', data: merged
-
-                    echo "Merged YAML:"
-                    echo readFile('merged.yaml')
                 }
+            }
+        }
+
+        post {
+            always {
+                echo "Cleaning workspace"
+                cleanWs()
             }
         }
     }
 }
-    post {
-        always {
-            echo "Cleaning workspace"
-            cleanWs()
-        }
-    }
-}
-
 
 /* =========================
-   Helper functions BELOW
+   Helper functions
    ========================= */
 
 def deepMerge(Map base, Map override) {
@@ -73,13 +74,11 @@ def deepMerge(Map base, Map override) {
 def mergeProgramArgs(List baseArgs, List overrideArgs) {
     Map merged = [:]
 
-    // base first
     baseArgs.each { arg ->
         def (k, val) = arg.split('=', 2)
         merged[k] = val
     }
 
-    // override wins
     overrideArgs.each { arg ->
         def (k, val) = arg.split('=', 2)
         merged[k] = val
