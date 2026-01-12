@@ -7,7 +7,7 @@ def call(Map cfg = [:]) {
             stage('Merge YAMLs') {
                 steps {
                     script {
-                        // ---------- Files ----------
+                        // -------- Files --------
                         def baseFile     = cfg.base     ?: 'config/base.yaml'
                         def commonFile   = cfg.common   ?: 'common-job-config.yaml'
                         def overrideFile = cfg.override ?: 'config/override.yaml'
@@ -18,7 +18,7 @@ def call(Map cfg = [:]) {
                             }
                         }
 
-                        // ---------- Read YAML ----------
+                        // -------- Read YAML --------
                         def base     = readYaml(file: baseFile)     ?: [:]
                         def common   = readYaml(file: commonFile)   ?: [:]
                         def override = readYaml(file: overrideFile) ?: [:]
@@ -26,16 +26,16 @@ def call(Map cfg = [:]) {
                         /*
                          * Merge order:
                          * 1️⃣ base
-                         * 2️⃣ common → ONLY programArgs
-                         * 3️⃣ override → ALL keys allowed
+                         * 2️⃣ common
+                         * 3️⃣ override (wins)
                          */
-                        def merged = deepMerge(base, common, false)
-                        merged     = deepMerge(merged, override, true)
+                        def merged = deepMerge(base, common)
+                        merged     = deepMerge(merged, override)
 
-                        // ---------- Write YAML ----------
+                        // -------- Write YAML --------
                         writeYaml file: 'merged.yaml', data: merged, overwrite: true
 
-                        // ---------- Force quotes for programArgs ----------
+                        // -------- Force quoted programArgs --------
                         forceQuoteProgramArgs('merged.yaml')
 
                         echo "Merged YAML:"
@@ -54,19 +54,20 @@ def call(Map cfg = [:]) {
 }
 
 /* =========================================================
-   Helper Functions (OUTSIDE pipeline – IMPORTANT)
+   Helper Functions (OUTSIDE pipeline)
    ========================================================= */
 
-def deepMerge(Map base, Map override, boolean allowAllKeys) {
+/*
+ * Generic deep merge
+ * - Maps → recursive merge
+ * - programArgs → Flink-specific logic
+ * - Everything else → override wins
+ */
+def deepMerge(Map base, Map override) {
     Map result = [:]
     result.putAll(base)
 
     override.each { k, v ->
-
-        // ⛔ Block non-programArgs from common-job-config.yaml
-        if (!allowAllKeys && k != 'programArgs') {
-            return
-        }
 
         if (k == 'programArgs'
                 && result[k] instanceof List
@@ -76,7 +77,7 @@ def deepMerge(Map base, Map override, boolean allowAllKeys) {
 
         } else if (result[k] instanceof Map && v instanceof Map) {
 
-            result[k] = deepMerge(result[k], v, allowAllKeys)
+            result[k] = deepMerge(result[k], v)
 
         } else {
 
@@ -88,31 +89,36 @@ def deepMerge(Map base, Map override, boolean allowAllKeys) {
 }
 
 /*
- * Merges Flink-style args:
- * --key=value  → override by key
- * --flag       → treated as boolean flag
+ * Flink programArgs merge
+ * Supports:
+ *   --key=value  → overridden by key
+ *   --flag       → treated as boolean flag
  */
 def mergeProgramArgs(List baseArgs, List overrideArgs) {
     Map merged = [:]
 
+    // base first
     baseArgs.each { arg ->
-        def parts = arg.replaceFirst(/^--/, '').split('=', 2)
+        def clean = arg.replaceFirst(/^--/, '')
+        def parts = clean.split('=', 2)
         merged[parts[0]] = parts.size() > 1 ? parts[1] : null
     }
 
+    // override wins
     overrideArgs.each { arg ->
-        def parts = arg.replaceFirst(/^--/, '').split('=', 2)
+        def clean = arg.replaceFirst(/^--/, '')
+        def parts = clean.split('=', 2)
         merged[parts[0]] = parts.size() > 1 ? parts[1] : null
     }
 
-    // Rebuild args WITHOUT quotes (YAML quoting happens later)
+    // rebuild args
     merged.collect { k, v ->
         v == null ? "--${k}" : "--${k}=${v}"
     }
 }
 
 /*
- * Ensures output:
+ * Ensures YAML output like:
  *   - "--rack-DXB"
  *   - "--key=value"
  */
