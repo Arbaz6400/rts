@@ -7,41 +7,36 @@ def call(Map cfg = [:]) {
             stage('Merge YAMLs') {
                 steps {
                     script {
-
+                        // ---------- Files ----------
                         def baseFile     = cfg.base     ?: 'config/base.yaml'
                         def commonFile   = cfg.common   ?: 'common-job-config.yaml'
                         def overrideFile = cfg.override ?: 'config/override.yaml'
 
-                        // ---------- validate ----------
                         [baseFile, commonFile, overrideFile].each { f ->
                             if (!fileExists(f)) {
                                 error "YAML not found: ${f}"
                             }
                         }
 
-                        // ---------- load yamls ----------
+                        // ---------- Read YAML ----------
                         def base     = readYaml(file: baseFile)     ?: [:]
                         def common   = readYaml(file: commonFile)   ?: [:]
                         def override = readYaml(file: overrideFile) ?: [:]
 
-                        // ---------- programArgs only ----------
-                        def baseArgs     = (base.programArgs     instanceof List) ? base.programArgs     : []
-                        def commonArgs   = (common.programArgs   instanceof List) ? common.programArgs   : []
-                        def overrideArgs = (override.programArgs instanceof List) ? override.programArgs : []
+                        /*
+                         * Merge order:
+                         * 1️⃣ base
+                         * 2️⃣ common → ONLY programArgs
+                         * 3️⃣ override → ALL keys allowed
+                         */
+                        def merged = deepMerge(base, common, false)
+                        merged     = deepMerge(merged, override, true)
 
-                        def mergedProgramArgs = mergeProgramArgs(
-                                mergeProgramArgs(baseArgs, commonArgs),
-                                overrideArgs
-                        )
+                        // ---------- Write YAML ----------
+                        writeYaml file: 'merged.yaml', data: merged, overwrite: true
 
-                        // ---------- final yaml ----------
-                        Map finalYaml = [:]
-                        finalYaml.putAll(base)              // base structure
-                        finalYaml.putAll(override)          // override can add keys
-                        finalYaml.programArgs = mergedProgramArgs // enforce rules
-
-                        // ---------- write safely ----------
-                        writeYaml file: 'merged.yaml', data: finalYaml, overwrite: true
+                        // ---------- Force quotes for programArgs ----------
+                        forceQuoteProgramArgs('merged.yaml')
 
                         echo "Merged YAML:"
                         echo readFile('merged.yaml')
@@ -49,72 +44,85 @@ def call(Map cfg = [:]) {
                 }
             }
         }
+
+        post {
+            always {
+                cleanWs()
+            }
+        }
     }
 }
 
-def deepMerge(Map base, Map override, boolean onlyProgramArgs = false) {
+/* =========================================================
+   Helper Functions (OUTSIDE pipeline – IMPORTANT)
+   ========================================================= */
+
+def deepMerge(Map base, Map override, boolean allowAllKeys) {
     Map result = [:]
     result.putAll(base)
 
     override.each { k, v ->
+
+        // ⛔ Block non-programArgs from common-job-config.yaml
+        if (!allowAllKeys && k != 'programArgs') {
+            return
+        }
+
         if (k == 'programArgs'
                 && result[k] instanceof List
                 && v instanceof List) {
 
             result[k] = mergeProgramArgs(result[k], v)
 
-        } else if (!onlyProgramArgs) {
-            // allow other keys only when not restricted
+        } else if (result[k] instanceof Map && v instanceof Map) {
+
+            result[k] = deepMerge(result[k], v, allowAllKeys)
+
+        } else {
+
             result[k] = v
         }
     }
+
     return result
 }
 
+/*
+ * Merges Flink-style args:
+ * --key=value  → override by key
+ * --flag       → treated as boolean flag
+ */
 def mergeProgramArgs(List baseArgs, List overrideArgs) {
     Map merged = [:]
 
-    def normalize = { arg ->
-        def s = arg.toString().trim()
-
-        // remove surrounding quotes
-        if ((s.startsWith('"') && s.endsWith('"')) ||
-            (s.startsWith("'") && s.endsWith("'"))) {
-            s = s[1..-2]
-        }
-
-        // remove leading --
-        if (s.startsWith('--')) {
-            s = s.substring(2)
-        }
-
-        return s
-    }
-
-    // base first
     baseArgs.each { arg ->
-        def s = normalize(arg)
-        if (s.contains('=')) {
-            def (k, v) = s.split('=', 2)
-            merged[k] = v
-        } else {
-            merged[s] = null
-        }
+        def parts = arg.replaceFirst(/^--/, '').split('=', 2)
+        merged[parts[0]] = parts.size() > 1 ? parts[1] : null
     }
 
-    // override wins
     overrideArgs.each { arg ->
-        def s = normalize(arg)
-        if (s.contains('=')) {
-            def (k, v) = s.split('=', 2)
-            merged[k] = v
-        } else {
-            merged[s] = null
-        }
+        def parts = arg.replaceFirst(/^--/, '').split('=', 2)
+        merged[parts[0]] = parts.size() > 1 ? parts[1] : null
     }
 
-    // 🚀 RETURN RAW STRINGS (no quotes)
+    // Rebuild args WITHOUT quotes (YAML quoting happens later)
     merged.collect { k, v ->
         v == null ? "--${k}" : "--${k}=${v}"
     }
+}
+
+/*
+ * Ensures output:
+ *   - "--rack-DXB"
+ *   - "--key=value"
+ */
+def forceQuoteProgramArgs(String file) {
+    def text = readFile(file)
+
+    text = text.replaceAll(
+        /(?m)^- (--.*)$/,
+        '- "$1"'
+    )
+
+    writeFile file: file, text: text
 }
