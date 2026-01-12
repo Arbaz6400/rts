@@ -1,79 +1,86 @@
-def mergeProgramArgs(Map base, Map override) {
-    Map result = [:]
-
-    // Copy everything from base
-    base.each { k, v ->
-        result[k] = v
-    }
-
-    override.each { k, v ->
-        if (k == 'programArgs' && v instanceof List) {
-            def baseList = result[k] instanceof List ? result[k] : []
-
-            // Convert list of "key=value" strings to map
-            def mapBase = [:]
-            baseList.each { entry ->
-                def (key, value) = entry.split('=', 2)
-                mapBase[key] = value
-            }
-
-            // Merge override
-            v.each { entry ->
-                def (key, value) = entry.split('=', 2)
-                mapBase[key] = value // overwrite or append
-            }
-
-            // Convert back to list
-            result[k] = mapBase.collect { mapKey, mapVal -> "${mapKey}=${mapVal}" }
-        } else if (v instanceof Map && result[k] instanceof Map) {
-            result[k] = mergeProgramArgs(result[k], v) // recursive for nested maps
-        } else {
-            result[k] = v
-        }
-    }
-
-    return result
-}
-
-// 3-layer merge
-def mergeThreeLayers(Map base, Map common, Map envOverride) {
-    def merged = mergeProgramArgs(base, common)
-    merged = mergeProgramArgs(merged, envOverride)
-    return merged
-}
-
-
-
 def call(Map cfg = [:]) {
-    pipeline {
-        agent any
-        stages {
-            stage('Merge YAMLs') {
-                steps {
-                    script {
-                        def baseFile = cfg.base ?: 'config/base.yaml'
-                        def overrideFile = cfg.override ?: 'config/override.yaml'
 
-                        if (!fileExists(baseFile)) error "Base YAML not found: ${baseFile}"
-                        if (!fileExists(overrideFile)) error "Override YAML not found: ${overrideFile}"
+pipeline {
+    agent any
 
-                        def base = readYaml(file: baseFile) ?: [:]
-                        def override = readYaml(file: overrideFile) ?: [:]
+    stages {
+        stage('Merge YAMLs') {
+            steps {
+                script {
+                    def baseFile     = cfg.base     ?: 'config/base.yaml'
+                    def commonFile   = cfg.common   ?: 'common-job-config.yaml'
+                    def overrideFile = cfg.override ?: 'config/override.yaml'
 
-                        // Only merge programArgs
-                        def merged = mergeProgramArgs(base as Map, override as Map)
-
-                        if (fileExists('merged.yaml')) {
-                            if (isUnix()) sh 'rm -f merged.yaml' else bat 'del /F merged.yaml'
+                    [baseFile, commonFile, overrideFile].each { f ->
+                        if (!fileExists(f)) {
+                            error "YAML not found: ${f}"
                         }
-
-                        writeYaml file: 'merged.yaml', data: merged
-
-                        echo "Merged YAML:"
-                        if (isUnix()) sh 'cat merged.yaml' else bat 'type merged.yaml'
                     }
+
+                    def base     = readYaml(file: baseFile)     ?: [:]
+                    def common   = readYaml(file: commonFile)   ?: [:]
+                    def override = readYaml(file: overrideFile) ?: [:]
+
+                    // Merge order: base → common → override
+                    def merged = deepMerge(base, common)
+                    merged = deepMerge(merged, override)
+
+                    if (fileExists('merged.yaml')) {
+                        sh 'rm -f merged.yaml'
+                    }
+
+                    writeYaml file: 'merged.yaml', data: merged
+
+                    echo "Merged YAML:"
+                    sh 'cat merged.yaml'
                 }
             }
         }
     }
+}
+}
+
+/* =========================
+   Helper functions BELOW
+   ========================= */
+
+def deepMerge(Map base, Map override) {
+    Map result = [:]
+    result.putAll(base)
+
+    override.each { k, v ->
+        if (k == 'programArgs'
+                && result[k] instanceof List
+                && v instanceof List) {
+
+            result[k] = mergeProgramArgs(result[k], v)
+
+        } else if (result[k] instanceof Map && v instanceof Map) {
+
+            result[k] = deepMerge(result[k], v)
+
+        } else {
+
+            result[k] = v
+        }
+    }
+    return result
+}
+
+def mergeProgramArgs(List baseArgs, List overrideArgs) {
+    Map merged = [:]
+
+    // base first
+    baseArgs.each { arg ->
+        def (k, val) = arg.split('=', 2)
+        merged[k] = val
+    }
+
+    // override wins
+    overrideArgs.each { arg ->
+        def (k, val) = arg.split('=', 2)
+        merged[k] = val
+    }
+
+    merged.collect { k, v -> "${k}=${v}" }
 }
