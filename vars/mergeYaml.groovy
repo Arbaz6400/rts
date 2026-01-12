@@ -1,55 +1,38 @@
-def deepMerge(Object base, Object override) {
+def call(Map cfg = [:]) {
 
-    // Map + Map → recursive merge
-    if (base instanceof Map && override instanceof Map) {
-        Map result = [:]
+    pipeline {
+        agent any
 
-        base.each { k, v ->
-            result[k] = v
-        }
+        stages {
+            stage('Merge YAMLs') {
+                steps {
+                    script {
+                        def baseFile = cfg.base ?: 'config/base.yaml'
+                        def overrideFile = cfg.override ?: 'config/override.yaml'
 
-        override.each { k, v ->
-            if (result[k] != null) {
-                result[k] = deepMerge(result[k], v)
-            } else {
-                result[k] = v
+                        echo "Using base: ${baseFile}"
+                        echo "Using override: ${overrideFile}"
+
+                        if (!fileExists(baseFile)) {
+                            error "Base YAML not found: ${baseFile}"
+                        }
+
+                        if (!fileExists(overrideFile)) {
+                            error "Override YAML not found: ${overrideFile}"
+                        }
+
+                        def base = readYaml(file: baseFile) ?: [:]
+                        def override = readYaml(file: overrideFile) ?: [:]
+
+                        def merged = deepMerge(base as Map, override as Map)
+
+                        writeYaml file: 'merged.yaml', data: merged
+
+                        echo "Merged YAML:"
+                        sh 'cat merged.yaml'
+                    }
+                }
             }
         }
-        return result
     }
-
-    // List + List → merge by name
-    if (base instanceof List && override instanceof List) {
-
-        List result = []
-
-        // index base list by name
-        Map<String, Map> baseIndex = [:]
-        base.each { item ->
-            if (item instanceof Map && item.name) {
-                baseIndex[item.name] = item
-            } else {
-                result << item
-            }
-        }
-
-        override.each { item ->
-            if (item instanceof Map && item.name && baseIndex[item.name]) {
-                result << deepMerge(baseIndex[item.name], item)
-                baseIndex.remove(item.name)
-            } else {
-                result << item
-            }
-        }
-
-        // add remaining base items
-        baseIndex.values().each {
-            result << it
-        }
-
-        return result
-    }
-
-    // Everything else → override wins
-    return override
 }
