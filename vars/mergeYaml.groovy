@@ -69,6 +69,13 @@ def deepMerge(Map base, Map override) {
 
     override.each { k, v ->
 
+        // 🚫 Ignore null or empty override values
+        if (v == null ||
+            (v instanceof Map && v.isEmpty()) ||
+            (v instanceof List && v.isEmpty())) {
+            return
+        }
+
         if (k == 'programArgs'
                 && result[k] instanceof List
                 && v instanceof List) {
@@ -87,6 +94,7 @@ def deepMerge(Map base, Map override) {
 
     return result
 }
+
 
 /*
  * Flink programArgs merge
