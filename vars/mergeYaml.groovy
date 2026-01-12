@@ -1,15 +1,17 @@
-def call() {
+def call(Map cfg = [:]) {
 
 pipeline {
     agent any
 
     stages {
-
         stage('Merge YAMLs') {
             steps {
                 script {
-                    def baseFile = 'config/base.yaml'
-                    def overrideFile = 'config/override.yaml'
+                    def baseFile = cfg.base ?: 'config/base.yaml'
+                    def overrideFile = cfg.override ?: 'config/override.yaml'
+
+                    echo "Using base: ${baseFile}"
+                    echo "Using override: ${overrideFile}"
 
                     if (!fileExists(baseFile)) {
                         error "Base YAML not found: ${baseFile}"
@@ -24,8 +26,8 @@ pipeline {
 
                     def merged = deepMerge(base as Map, override as Map)
 
-                    echo "Merged YAML:"
-                    echo merged.toString()
+                    echo "====== MERGED YAML ======"
+                    echo writeYaml(returnText: true, data: merged)
 
                     writeYaml file: 'merged.yaml', data: merged
                 }
@@ -33,23 +35,4 @@ pipeline {
         }
     }
 }
-}
-
-/* --------- HELPER FUNCTIONS (OUTSIDE pipeline) --------- */
-
-def deepMerge(Map base, Map override) {
-    Map result = [:]
-
-    base.each { k, v ->
-        result[k] = v
-    }
-
-    override.each { k, v ->
-        if (result[k] instanceof Map && v instanceof Map) {
-            result[k] = deepMerge(result[k], v)
-        } else {
-            result[k] = v
-        }
-    }
-    return result
 }
