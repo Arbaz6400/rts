@@ -22,7 +22,7 @@ pipeline {
                     def override = readYaml(file: overrideFile) ?: [:]
 
                     def merged = deepMerge(base, common)
-                    merged = deepMerge(merged, override)
+writeYaml file: 'merged.yaml', data: merged, overwrite: true
 
                     // ✅ overwrite safely (no rm needed)
                     writeYaml file: 'merged.yaml', data: merged
