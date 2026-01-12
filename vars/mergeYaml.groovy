@@ -55,32 +55,39 @@ def call(Map cfg = [:]) {
 /* =====================================================
    Helper functions (MUST be outside pipeline)
    ===================================================== */
-
 def mergeProgramArgs(List baseArgs, List overrideArgs) {
     Map merged = [:]
 
+    def normalize = { String arg ->
+        arg.startsWith('--') ? arg.substring(2) : arg
+    }
+
     // base first
     baseArgs.each { arg ->
-        if (arg.contains('=')) {
-            def (k, v) = arg.split('=', 2)
+        def clean = normalize(arg)
+
+        if (clean.contains('=')) {
+            def (k, v) = clean.split('=', 2)
             merged[k] = v
         } else {
-            merged[arg] = null   // flag-style arg like "rack-DXB"
+            merged[clean] = null
         }
     }
 
     // override wins
     overrideArgs.each { arg ->
-        if (arg.contains('=')) {
-            def (k, v) = arg.split('=', 2)
+        def clean = normalize(arg)
+
+        if (clean.contains('=')) {
+            def (k, v) = clean.split('=', 2)
             merged[k] = v
         } else {
-            merged[arg] = null
+            merged[clean] = null
         }
     }
 
-    // rebuild list
+    // rebuild args WITH --
     merged.collect { k, v ->
-        v == null ? k : "${k}=${v}"
+        v == null ? "--${k}" : "--${k}=${v}"
     }
 }
