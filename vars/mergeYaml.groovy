@@ -24,8 +24,8 @@ pipeline {
                     def merged = deepMerge(base, common)
 writeYaml file: 'merged.yaml', data: merged, overwrite: true
 
-                    // ✅ overwrite safely (no rm needed)
-                    writeYaml file: 'merged.yaml', data: merged
+                    // // ✅ overwrite safely (no rm needed)
+                    // writeYaml file: 'merged.yaml', data: merged
 
                     echo "Merged YAML:"
                     echo readFile('merged.yaml')
@@ -34,6 +34,12 @@ writeYaml file: 'merged.yaml', data: merged, overwrite: true
         }
     }
 }
+    post {
+        always {
+            echo "Cleaning workspace"
+            cleanWs()
+        }
+    }
 }
 
 
