@@ -72,17 +72,28 @@ def deepMerge(Map base, Map override) {
 }
 
 def mergeProgramArgs(List baseArgs, List overrideArgs) {
-    Map merged = [:]
+    Map kv = [:]
+    List flags = []
 
-    baseArgs.each { arg ->
-        def (k, val) = arg.split('=', 2)
-        merged[k] = val
+    def process = { arg ->
+        if (arg.contains('=')) {
+            def parts = arg.split('=', 2)
+            kv[parts[0]] = parts[1]
+        } else {
+            flags << arg
+        }
     }
 
-    overrideArgs.each { arg ->
-        def (k, val) = arg.split('=', 2)
-        merged[k] = val
-    }
+    // base first
+    baseArgs.each(process)
 
-    merged.collect { k, v -> "${k}=${v}" }
+    // override wins
+    overrideArgs.each(process)
+
+    // rebuild final list
+    List result = []
+    kv.each { k, v -> result << "${k}=${v}" }
+    result.addAll(flags.unique())
+
+    return result
 }
