@@ -77,7 +77,7 @@ def mergeProgramArgs(List baseArgs, List overrideArgs) {
     def normalize = { arg ->
         def s = arg.toString().trim()
 
-        // remove surrounding quotes if present
+        // remove surrounding quotes
         if ((s.startsWith('"') && s.endsWith('"')) ||
             (s.startsWith("'") && s.endsWith("'"))) {
             s = s[1..-2]
@@ -113,11 +113,8 @@ def mergeProgramArgs(List baseArgs, List overrideArgs) {
         }
     }
 
-    // output WITH quotes and --
-    return merged.collect { k, v ->
-        v == null ? "\"--${k}\"" : "\"--${k}=${v}\""
+    // 🚀 RETURN RAW STRINGS (no quotes)
+    merged.collect { k, v ->
+        v == null ? "--${k}" : "--${k}=${v}"
     }
 }
-
-
-
