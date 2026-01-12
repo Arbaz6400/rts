@@ -22,8 +22,8 @@ def mergeProgramArgs(Map base, Map override) {
                 mapBase[key] = value // overwrite or append
             }
 
-            // Convert back to list of strings
-            result[k] = mapBase.collect { k, val -> "${k}=${val}" }
+            // Convert back to list of strings — use different variable names
+            result[k] = mapBase.collect { mapKey, mapVal -> "${mapKey}=${mapVal}" }
         } else if (v instanceof Map && result[k] instanceof Map) {
             result[k] = mergeProgramArgs(result[k], v) // recursive for nested maps
         } else {
@@ -33,6 +33,7 @@ def mergeProgramArgs(Map base, Map override) {
 
     return result
 }
+
 
 
 def call(Map cfg = [:]) {
