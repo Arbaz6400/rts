@@ -52,43 +52,72 @@ def call(Map cfg = [:]) {
     }
 }
 
-/* =====================================================
-   Helper functions (MUST be outside pipeline)
-   ===================================================== */
+def deepMerge(Map base, Map override, boolean onlyProgramArgs = false) {
+    Map result = [:]
+    result.putAll(base)
+
+    override.each { k, v ->
+        if (k == 'programArgs'
+                && result[k] instanceof List
+                && v instanceof List) {
+
+            result[k] = mergeProgramArgs(result[k], v)
+
+        } else if (!onlyProgramArgs) {
+            // allow other keys only when not restricted
+            result[k] = v
+        }
+    }
+    return result
+}
+
 def mergeProgramArgs(List baseArgs, List overrideArgs) {
     Map merged = [:]
 
-    def normalize = { String arg ->
-        arg.startsWith('--') ? arg.substring(2) : arg
+    def normalize = { arg ->
+        def s = arg.toString().trim()
+
+        // remove surrounding quotes if present
+        if ((s.startsWith('"') && s.endsWith('"')) ||
+            (s.startsWith("'") && s.endsWith("'"))) {
+            s = s[1..-2]
+        }
+
+        // remove leading --
+        if (s.startsWith('--')) {
+            s = s.substring(2)
+        }
+
+        return s
     }
 
     // base first
     baseArgs.each { arg ->
-        def clean = normalize(arg)
-
-        if (clean.contains('=')) {
-            def (k, v) = clean.split('=', 2)
+        def s = normalize(arg)
+        if (s.contains('=')) {
+            def (k, v) = s.split('=', 2)
             merged[k] = v
         } else {
-            merged[clean] = null
+            merged[s] = null
         }
     }
 
     // override wins
     overrideArgs.each { arg ->
-        def clean = normalize(arg)
-
-        if (clean.contains('=')) {
-            def (k, v) = clean.split('=', 2)
+        def s = normalize(arg)
+        if (s.contains('=')) {
+            def (k, v) = s.split('=', 2)
             merged[k] = v
         } else {
-            merged[clean] = null
+            merged[s] = null
         }
     }
 
-    // rebuild args WITH --
-   merged.collect { k, v ->
-    v == null ? "\"--${k}\"" : "\"--${k}=${v}\""
+    // output WITH quotes and --
+    return merged.collect { k, v ->
+        v == null ? "\"--${k}\"" : "\"--${k}=${v}\""
+    }
 }
 
-}
+
+
