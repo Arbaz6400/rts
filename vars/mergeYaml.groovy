@@ -87,7 +87,8 @@ def mergeProgramArgs(List baseArgs, List overrideArgs) {
     }
 
     // rebuild args WITH --
-    merged.collect { k, v ->
-        v == null ? "--${k}" : "--${k}=${v}"
-    }
+   merged.collect { k, v ->
+    v == null ? "\"--${k}\"" : "\"--${k}=${v}\""
+}
+
 }
