@@ -7,26 +7,41 @@ def call(Map cfg = [:]) {
             stage('Merge YAMLs') {
                 steps {
                     script {
+
                         def baseFile     = cfg.base     ?: 'config/base.yaml'
                         def commonFile   = cfg.common   ?: 'common-job-config.yaml'
                         def overrideFile = cfg.override ?: 'config/override.yaml'
 
+                        // ---------- validate ----------
                         [baseFile, commonFile, overrideFile].each { f ->
                             if (!fileExists(f)) {
                                 error "YAML not found: ${f}"
                             }
                         }
 
+                        // ---------- load yamls ----------
                         def base     = readYaml(file: baseFile)     ?: [:]
                         def common   = readYaml(file: commonFile)   ?: [:]
                         def override = readYaml(file: overrideFile) ?: [:]
 
-                        def merged = deepMerge(base, common)
-                        merged = deepMerge(merged, override)
+                        // ---------- programArgs only ----------
+                        def baseArgs     = (base.programArgs     instanceof List) ? base.programArgs     : []
+                        def commonArgs   = (common.programArgs   instanceof List) ? common.programArgs   : []
+                        def overrideArgs = (override.programArgs instanceof List) ? override.programArgs : []
 
-                        writeYaml file: 'merged.yaml',
-                                  data: merged,
-                                  overwrite: true
+                        def mergedProgramArgs = mergeProgramArgs(
+                                mergeProgramArgs(baseArgs, commonArgs),
+                                overrideArgs
+                        )
+
+                        // ---------- final yaml ----------
+                        Map finalYaml = [:]
+                        finalYaml.putAll(base)              // base structure
+                        finalYaml.putAll(override)          // override can add keys
+                        finalYaml.programArgs = mergedProgramArgs // enforce rules
+
+                        // ---------- write safely ----------
+                        writeYaml file: 'merged.yaml', data: finalYaml, overwrite: true
 
                         echo "Merged YAML:"
                         echo readFile('merged.yaml')
@@ -34,66 +49,38 @@ def call(Map cfg = [:]) {
                 }
             }
         }
-
-        post {
-            always {
-                echo "Cleaning workspace"
-                cleanWs()
-            }
-        }
     }
 }
 
-/* =========================
-   Helper functions
-   ========================= */
-
-def deepMerge(Map base, Map override) {
-    Map result = [:]
-    result.putAll(base)
-
-    override.each { k, v ->
-        if (k == 'programArgs'
-                && result[k] instanceof List
-                && v instanceof List) {
-
-            result[k] = mergeProgramArgs(result[k], v)
-
-        } else if (result[k] instanceof Map && v instanceof Map) {
-
-            result[k] = deepMerge(result[k], v)
-
-        } else {
-
-            result[k] = v
-        }
-    }
-    return result
-}
+/* =====================================================
+   Helper functions (MUST be outside pipeline)
+   ===================================================== */
 
 def mergeProgramArgs(List baseArgs, List overrideArgs) {
-    Map kv = [:]
-    List flags = []
+    Map merged = [:]
 
-    def process = { arg ->
+    // base first
+    baseArgs.each { arg ->
         if (arg.contains('=')) {
-            def parts = arg.split('=', 2)
-            kv[parts[0]] = parts[1]
+            def (k, v) = arg.split('=', 2)
+            merged[k] = v
         } else {
-            flags << arg
+            merged[arg] = null   // flag-style arg like "rack-DXB"
         }
     }
 
-    // base first
-    baseArgs.each(process)
-
     // override wins
-    overrideArgs.each(process)
+    overrideArgs.each { arg ->
+        if (arg.contains('=')) {
+            def (k, v) = arg.split('=', 2)
+            merged[k] = v
+        } else {
+            merged[arg] = null
+        }
+    }
 
-    // rebuild final list
-    List result = []
-    kv.each { k, v -> result << "${k}=${v}" }
-    result.addAll(flags.unique())
-
-    return result
+    // rebuild list
+    merged.collect { k, v ->
+        v == null ? k : "${k}=${v}"
+    }
 }
