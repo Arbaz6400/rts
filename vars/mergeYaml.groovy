@@ -1,19 +1,33 @@
-def deepMerge(Map base, Map override) {
+def mergeProgramArgs(Map base, Map override) {
     Map result = [:]
 
+    // Copy everything from base first
     base.each { k, v ->
         result[k] = v
     }
 
+    // Only override programArgs
     override.each { k, v ->
-        if (result[k] instanceof Map && v instanceof Map) {
-            result[k] = deepMerge(result[k], v)
-        }
-        else if (result[k] instanceof List && v instanceof List) {
-            // append lists
-            result[k] = result[k] + v
-        }
-        else {
+        if (k == 'programArgs' && v instanceof List) {
+            def baseList = result[k] instanceof List ? result[k] : []
+
+            // Create a map of base entries using a unique key (you can define what makes an entry unique)
+            // Here we assume each entry is a string; if it's an object, you can adjust
+            def mergedList = baseList.collect { it }.toList()
+
+            v.each { newEntry ->
+                // If exists in base, remove it first
+                if (mergedList.contains(newEntry)) {
+                    mergedList.remove(newEntry)
+                }
+                // Then add from override
+                mergedList << newEntry
+            }
+
+            result[k] = mergedList
+        } else if (v instanceof Map && result[k] instanceof Map) {
+            result[k] = mergeProgramArgs(result[k], v) // recursive for nested maps if needed
+        } else {
             result[k] = v
         }
     }
@@ -22,10 +36,8 @@ def deepMerge(Map base, Map override) {
 }
 
 def call(Map cfg = [:]) {
-
     pipeline {
         agent any
-
         stages {
             stage('Merge YAMLs') {
                 steps {
@@ -33,42 +45,23 @@ def call(Map cfg = [:]) {
                         def baseFile = cfg.base ?: 'config/base.yaml'
                         def overrideFile = cfg.override ?: 'config/override.yaml'
 
-                        echo "Using base: ${baseFile}"
-                        echo "Using override: ${overrideFile}"
-
-                        if (!fileExists(baseFile)) {
-                            error "Base YAML not found: ${baseFile}"
-                        }
-
-                        if (!fileExists(overrideFile)) {
-                            error "Override YAML not found: ${overrideFile}"
-                        }
+                        if (!fileExists(baseFile)) error "Base YAML not found: ${baseFile}"
+                        if (!fileExists(overrideFile)) error "Override YAML not found: ${overrideFile}"
 
                         def base = readYaml(file: baseFile) ?: [:]
                         def override = readYaml(file: overrideFile) ?: [:]
 
-                        def merged = deepMerge(base as Map, override as Map)
+                        // Only merge programArgs
+                        def merged = mergeProgramArgs(base as Map, override as Map)
 
-                        // Remove merged.yaml if exists
                         if (fileExists('merged.yaml')) {
-                            echo "Removing existing merged.yaml"
-                            if (isUnix()) {
-                                sh 'rm -f merged.yaml'
-                            } else {
-                                bat 'del /F merged.yaml'
-                            }
+                            if (isUnix()) sh 'rm -f merged.yaml' else bat 'del /F merged.yaml'
                         }
 
-                        // Write the merged YAML
                         writeYaml file: 'merged.yaml', data: merged
 
-                        // Print merged YAML
-                        echo "Merged YAML content:"
-                        if (isUnix()) {
-                            sh 'cat merged.yaml'
-                        } else {
-                            bat 'type merged.yaml'
-                        }
+                        echo "Merged YAML:"
+                        if (isUnix()) sh 'cat merged.yaml' else bat 'type merged.yaml'
                     }
                 }
             }
