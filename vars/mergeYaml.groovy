@@ -1,3 +1,26 @@
+def deepMerge(Map base, Map override) {
+    Map result = [:]
+
+    base.each { k, v ->
+        result[k] = v
+    }
+
+    override.each { k, v ->
+        if (result[k] instanceof Map && v instanceof Map) {
+            result[k] = deepMerge(result[k], v)
+        }
+        else if (result[k] instanceof List && v instanceof List) {
+            // append lists
+            result[k] = result[k] + v
+        }
+        else {
+            result[k] = v
+        }
+    }
+
+    return result
+}
+
 def call(Map cfg = [:]) {
 
     pipeline {
@@ -26,34 +49,29 @@ def call(Map cfg = [:]) {
 
                         def merged = deepMerge(base as Map, override as Map)
 
+                        // Remove merged.yaml if exists
+                        if (fileExists('merged.yaml')) {
+                            echo "Removing existing merged.yaml"
+                            if (isUnix()) {
+                                sh 'rm -f merged.yaml'
+                            } else {
+                                bat 'del /F merged.yaml'
+                            }
+                        }
+
+                        // Write the merged YAML
                         writeYaml file: 'merged.yaml', data: merged
 
-                        echo "Merged YAML:"
-                        sh 'cat merged.yaml'
+                        // Print merged YAML
+                        echo "Merged YAML content:"
+                        if (isUnix()) {
+                            sh 'cat merged.yaml'
+                        } else {
+                            bat 'type merged.yaml'
+                        }
                     }
                 }
             }
         }
     }
-}
-def deepMerge(Map base, Map override) {
-    Map result = [:]
-
-    base.each { k, v ->
-        result[k] = v
-    }
-
-    override.each { k, v ->
-        if (result[k] instanceof Map && v instanceof Map) {
-            result[k] = deepMerge(result[k], v)
-        }
-        else if (result[k] instanceof List && v instanceof List) {
-            // 👇 list append behavior
-            result[k] = result[k] + v
-        }
-        else {
-            result[k] = v
-        }
-    }
-    return result
 }
