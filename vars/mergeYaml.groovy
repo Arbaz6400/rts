@@ -24,7 +24,8 @@ pipeline {
                     def base = readYaml(file: baseFile) ?: [:]
                     def override = readYaml(file: overrideFile) ?: [:]
 
-                    def merged = deepMerge(base as Map, override as Map)
+                    // ✅ IMPORTANT FIX
+                    def merged = this.deepMerge(base as Map, override as Map)
 
                     echo "====== MERGED YAML ======"
                     echo writeYaml(returnText: true, data: merged)
@@ -35,4 +36,23 @@ pipeline {
         }
     }
 }
+}
+
+/* ---------- HELPER METHOD ---------- */
+
+def deepMerge(Map base, Map override) {
+    Map result = [:]
+
+    base.each { k, v ->
+        result[k] = v
+    }
+
+    override.each { k, v ->
+        if (result[k] instanceof Map && v instanceof Map) {
+            result[k] = deepMerge(result[k], v)
+        } else {
+            result[k] = v
+        }
+    }
+    return result
 }
