@@ -36,3 +36,24 @@ def call(Map cfg = [:]) {
         }
     }
 }
+def deepMerge(Map base, Map override) {
+    Map result = [:]
+
+    base.each { k, v ->
+        result[k] = v
+    }
+
+    override.each { k, v ->
+        if (result[k] instanceof Map && v instanceof Map) {
+            result[k] = deepMerge(result[k], v)
+        }
+        else if (result[k] instanceof List && v instanceof List) {
+            // 👇 list append behavior
+            result[k] = result[k] + v
+        }
+        else {
+            result[k] = v
+        }
+    }
+    return result
+}
