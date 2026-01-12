@@ -21,24 +21,21 @@ pipeline {
                     def common   = readYaml(file: commonFile)   ?: [:]
                     def override = readYaml(file: overrideFile) ?: [:]
 
-                    // Merge order: base → common → override
                     def merged = deepMerge(base, common)
                     merged = deepMerge(merged, override)
 
-                    if (fileExists('merged.yaml')) {
-                        sh 'rm -f merged.yaml'
-                    }
-
+                    // ✅ overwrite safely (no rm needed)
                     writeYaml file: 'merged.yaml', data: merged
 
                     echo "Merged YAML:"
-                    sh 'cat merged.yaml'
+                    echo readFile('merged.yaml')
                 }
             }
         }
     }
 }
 }
+
 
 /* =========================
    Helper functions BELOW
