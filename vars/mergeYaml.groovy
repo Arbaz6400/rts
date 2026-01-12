@@ -1,32 +1,31 @@
 def mergeProgramArgs(Map base, Map override) {
     Map result = [:]
 
-    // Copy everything from base first
+    // Copy everything from base
     base.each { k, v ->
         result[k] = v
     }
 
-    // Only override programArgs
     override.each { k, v ->
         if (k == 'programArgs' && v instanceof List) {
             def baseList = result[k] instanceof List ? result[k] : []
 
-            // Create a map of base entries using a unique key (you can define what makes an entry unique)
-            // Here we assume each entry is a string; if it's an object, you can adjust
-            def mergedList = baseList.collect { it }.toList()
-
-            v.each { newEntry ->
-                // If exists in base, remove it first
-                if (mergedList.contains(newEntry)) {
-                    mergedList.remove(newEntry)
-                }
-                // Then add from override
-                mergedList << newEntry
+            // Convert list of "key=value" strings to map
+            def mapBase = [:]
+            baseList.each { entry ->
+                def (key, value) = entry.split('=', 2)
+                mapBase[key] = value
             }
 
-            result[k] = mergedList
+            v.each { entry ->
+                def (key, value) = entry.split('=', 2)
+                mapBase[key] = value // overwrite or append
+            }
+
+            // Convert back to list of strings
+            result[k] = mapBase.collect { k, val -> "${k}=${val}" }
         } else if (v instanceof Map && result[k] instanceof Map) {
-            result[k] = mergeProgramArgs(result[k], v) // recursive for nested maps if needed
+            result[k] = mergeProgramArgs(result[k], v) // recursive for nested maps
         } else {
             result[k] = v
         }
@@ -34,6 +33,7 @@ def mergeProgramArgs(Map base, Map override) {
 
     return result
 }
+
 
 def call(Map cfg = [:]) {
     pipeline {
