@@ -17,12 +17,13 @@ def mergeProgramArgs(Map base, Map override) {
                 mapBase[key] = value
             }
 
+            // Merge override
             v.each { entry ->
                 def (key, value) = entry.split('=', 2)
                 mapBase[key] = value // overwrite or append
             }
 
-            // Convert back to list of strings — use different variable names
+            // Convert back to list
             result[k] = mapBase.collect { mapKey, mapVal -> "${mapKey}=${mapVal}" }
         } else if (v instanceof Map && result[k] instanceof Map) {
             result[k] = mergeProgramArgs(result[k], v) // recursive for nested maps
@@ -32,6 +33,13 @@ def mergeProgramArgs(Map base, Map override) {
     }
 
     return result
+}
+
+// 3-layer merge
+def mergeThreeLayers(Map base, Map common, Map envOverride) {
+    def merged = mergeProgramArgs(base, common)
+    merged = mergeProgramArgs(merged, envOverride)
+    return merged
 }
 
 
