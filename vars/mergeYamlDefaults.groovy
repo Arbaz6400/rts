@@ -1,4 +1,4 @@
-import com.company.config.DefaultValues
+import com.org.config.DefaultValues
 
 def call() {
 
