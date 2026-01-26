@@ -1,6 +1,6 @@
 import com.org.config.DefaultValues
 
-def call() {
+def call(Map cfg = [:]) {
 
     pipeline {
         agent any
@@ -10,48 +10,39 @@ def call() {
                 steps {
                     script {
 
-                        def valuesFile = "values.yaml"
+                        def baseFile   = cfg.base   ?: 'values.yaml'
+                        def commonFile = cfg.common ?: 'common-job-config.yaml'
 
-                        // Load existing yaml (or empty)
-                        Map userValues = [:]
-
-                        if (fileExists(valuesFile)) {
-                            userValues = readYaml(file: valuesFile) ?: [:]
+                        if (!fileExists(baseFile)) {
+                            error "Base YAML not found: ${baseFile}"
                         }
 
-                        // Load defaults from class
-                        Map defaults = DefaultValues.defaults()
+                        if (!fileExists(commonFile)) {
+                            error "Common YAML not found: ${commonFile}"
+                        }
 
-                        // Merge (user values override defaults)
-                        Map merged = mergeMaps(defaults, userValues)
+                        def baseYaml   = readYaml(file: baseFile)
+                        def commonYaml = readYaml(file: commonFile)
 
-                        // Write back
-                        writeYaml file: valuesFile, data: merged, overwrite: true
+                        def defaults = DefaultValues.defaults()
+
+                        def merged = defaults + commonYaml + baseYaml
+
+                        writeYaml file: baseFile, data: merged, overwrite: true
 
                         echo "Final values.yaml:"
-                        sh "cat ${valuesFile}"
+
+                        // Windows agent -> use bat, not sh
+                        bat "type ${baseFile}"
                     }
                 }
             }
         }
-    }
-}
 
-/**
- * Deep merge maps
- */
-@NonCPS
-Map mergeMaps(Map base, Map override) {
-    Map result = [:]
-    result.putAll(base)
-
-    override.each { k, v ->
-        if (v instanceof Map && result[k] instanceof Map) {
-            result[k] = mergeMaps(result[k], v)
-        } else {
-            result[k] = v
+        post {
+            always {
+                cleanWs()
+            }
         }
     }
-
-    return result
 }
