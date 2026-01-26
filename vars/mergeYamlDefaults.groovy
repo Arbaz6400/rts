@@ -16,20 +16,20 @@ def call() {
                             error "values.yaml not found"
                         }
 
-                        // Read existing values.yaml
+                        // Jenkins provided branch
+                        def branch = env.BRANCH_NAME ?: "uat"
+
+                        echo "Detected branch: ${branch}"
+
+                        // Load user yaml
                         def userYaml = readYaml(file: valuesFile) ?: [:]
 
-                        // Load defaults from class
-                        def defaults = DefaultValues.defaults()
+                        // Load env-specific defaults
+                        def defaults = DefaultValues.defaults(branch)
 
-                        /*
-                         Map + Map behavior:
-                         left overwritten by right
-                         So defaults + userYaml keeps user values
-                        */
+                        // Merge (user overrides defaults)
                         def merged = defaults + userYaml
 
-                        // Write back merged yaml
                         writeYaml file: valuesFile, data: merged, overwrite: true
 
                         echo "Final merged values.yaml:"
