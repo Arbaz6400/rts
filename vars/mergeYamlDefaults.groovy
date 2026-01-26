@@ -8,7 +8,7 @@ def call() {
 
         stages {
 
-            stage('Load values.yaml') {
+            stage('Merge YAML Defaults') {
                 steps {
                     script {
 
@@ -16,42 +16,29 @@ def call() {
                             error "YAML not found: values.yaml"
                         }
 
-                        yaml = new Yaml()
+                        // Always use def (important for Jenkins CPS)
+                        def yaml = new Yaml()
 
-                        userValues = yaml.load(readFile("values.yaml")) ?: [:]
-
-                        echo "Loaded values.yaml successfully"
-                    }
-                }
-            }
-
-            stage('Validate + Merge Defaults') {
-                steps {
-                    script {
+                        def userValues = yaml.load(readFile("values.yaml")) ?: [:]
 
                         // Validate required fields
                         DefaultValues.validate(userValues)
 
                         def defaults = DefaultValues.get()
 
-                        merged = deepMerge(defaults ?: [:], userValues ?: [:])
-
-                        echo "Defaults merged successfully"
-                    }
-                }
-            }
-
-            stage('Write Final YAML') {
-                steps {
-                    script {
+                        def merged = deepMerge(defaults ?: [:], userValues ?: [:])
 
                         writeFile file: "values.final.yaml",
                                   text: yaml.dump(merged)
 
                         echo "Generated values.final.yaml"
 
-                        // Optional: show diff
-                        sh "diff -u values.yaml values.final.yaml || true"
+                        // Optional diff (safe if git-bash exists)
+                        try {
+                            sh "diff -u values.yaml values.final.yaml || true"
+                        } catch (ignored) {
+                            echo "Diff skipped (Windows agent)"
+                        }
                     }
                 }
             }
@@ -59,7 +46,7 @@ def call() {
     }
 }
 
-/* ---------------- Helper: Deep Merge ---------------- */
+/* ---------------- Helper ---------------- */
 
 def deepMerge(Map defaults, Map user) {
 
