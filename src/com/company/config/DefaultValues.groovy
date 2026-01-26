@@ -1,34 +1,13 @@
+package com.org.config
 
-package com.company.config
+class DefaultValues implements Serializable {
 
-class DefaultValues {
-
-    /**
-     * Central place for all default values.
-     * These will be applied ONLY when missing in values.yaml
-     */
-    static Map get() {
-
+    static Map defaults() {
         return [
-
             namespace : "default",
-
-            env : "dev",
-
-            vault : [
-                path  : "secret/data/app",
-                token : ""   // intentionally empty – user/CI should override
-            ]
+            vaultPath : "secret/data/app",
+            vaultToken: "changeme",
+            env       : "dev"
         ]
-    }
-
-    /**
-     * Optional validation for required fields
-     */
-    static void validate(Map userValues) {
-
-        if (!userValues?.vault?.token) {
-            throw new Exception("vault.token must be provided (cannot use default)")
-        }
     }
 }
