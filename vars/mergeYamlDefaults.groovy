@@ -1,6 +1,6 @@
 import com.org.config.DefaultValues
 
-def call(Map cfg = [:]) {
+def call() {
 
     pipeline {
         agent any
@@ -10,30 +10,32 @@ def call(Map cfg = [:]) {
                 steps {
                     script {
 
-                        def baseFile   = cfg.base   ?: 'values.yaml'
-                        def commonFile = cfg.common ?: 'common-job-config.yaml'
+                        def valuesFile = "values.yaml"
 
-                        if (!fileExists(baseFile)) {
-                            error "Base YAML not found: ${baseFile}"
+                        if (!fileExists(valuesFile)) {
+                            error "values.yaml not found"
                         }
 
-                        if (!fileExists(commonFile)) {
-                            error "Common YAML not found: ${commonFile}"
-                        }
+                        // Read existing values.yaml
+                        def userYaml = readYaml(file: valuesFile) ?: [:]
 
-                        def baseYaml   = readYaml(file: baseFile)
-                        def commonYaml = readYaml(file: commonFile)
-
+                        // Load defaults from class
                         def defaults = DefaultValues.defaults()
 
-                        def merged = defaults + commonYaml + baseYaml
+                        /*
+                         Map + Map behavior:
+                         left overwritten by right
+                         So defaults + userYaml keeps user values
+                        */
+                        def merged = defaults + userYaml
 
-                        writeYaml file: baseFile, data: merged, overwrite: true
+                        // Write back merged yaml
+                        writeYaml file: valuesFile, data: merged, overwrite: true
 
-                        echo "Final values.yaml:"
+                        echo "Final merged values.yaml:"
 
-                        // Windows agent -> use bat, not sh
-                        bat "type ${baseFile}"
+                        // Windows agent
+                        bat "type ${valuesFile}"
                     }
                 }
             }
