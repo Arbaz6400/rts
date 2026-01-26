@@ -1,13 +1,13 @@
 package com.org.config
 
-class DefaultValues implements Serializable {
+class DefaultValues {
 
     static Map defaults() {
         return [
             namespace : "default",
             vaultPath : "secret/data/app",
             vaultToken: "changeme",
-            env       : "dev"
+            env       : "uat"
         ]
     }
 }
