@@ -1,5 +1,4 @@
-import org.yaml.snakeyaml.Yaml
-import com.company.config.DefaultValues
+import com.org.config.DefaultValues
 
 def call() {
 
@@ -7,38 +6,30 @@ def call() {
         agent any
 
         stages {
-
             stage('Merge YAML Defaults') {
                 steps {
                     script {
 
-                        if (!fileExists("values.yaml")) {
-                            error "YAML not found: values.yaml"
+                        def valuesFile = "values.yaml"
+
+                        // Load existing yaml (or empty)
+                        Map userValues = [:]
+
+                        if (fileExists(valuesFile)) {
+                            userValues = readYaml(file: valuesFile) ?: [:]
                         }
 
-                        // Always use def (important for Jenkins CPS)
-                        def yaml = new Yaml()
+                        // Load defaults from class
+                        Map defaults = DefaultValues.defaults()
 
-                        def userValues = yaml.load(readFile("values.yaml")) ?: [:]
+                        // Merge (user values override defaults)
+                        Map merged = mergeMaps(defaults, userValues)
 
-                        // Validate required fields
-                        DefaultValues.validate(userValues)
+                        // Write back
+                        writeYaml file: valuesFile, data: merged, overwrite: true
 
-                        def defaults = DefaultValues.get()
-
-                        def merged = deepMerge(defaults ?: [:], userValues ?: [:])
-
-                        writeFile file: "values.final.yaml",
-                                  text: yaml.dump(merged)
-
-                        echo "Generated values.final.yaml"
-
-                        // Optional diff (safe if git-bash exists)
-                        try {
-                            sh "diff -u values.yaml values.final.yaml || true"
-                        } catch (ignored) {
-                            echo "Diff skipped (Windows agent)"
-                        }
+                        echo "Final values.yaml:"
+                        sh "cat ${valuesFile}"
                     }
                 }
             }
@@ -46,23 +37,21 @@ def call() {
     }
 }
 
-/* ---------------- Helper ---------------- */
+/**
+ * Deep merge maps
+ */
+@NonCPS
+Map mergeMaps(Map base, Map override) {
+    Map result = [:]
+    result.putAll(base)
 
-def deepMerge(Map defaults, Map user) {
-
-    defaults.collectEntries { k, v ->
-
-        if (user.containsKey(k)) {
-
-            if (v instanceof Map && user[k] instanceof Map) {
-                [(k): deepMerge(v, user[k])]
-            } else {
-                [(k): user[k]]
-            }
-
+    override.each { k, v ->
+        if (v instanceof Map && result[k] instanceof Map) {
+            result[k] = mergeMaps(result[k], v)
         } else {
-            [(k): v]
+            result[k] = v
         }
+    }
 
-    } + user.findAll { !defaults.containsKey(it.key) }
+    return result
 }
