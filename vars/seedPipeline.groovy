@@ -16,9 +16,11 @@ def call() {
 
 def generateClusterJobs() {
     jobDsl(
-        scriptText: buildDsl(),
-        sandbox: true
-    )
+  targets: 'dsl/**/*.groovy',
+  removedJobAction: 'DELETE',
+  removedViewAction: 'DELETE'
+)
+
 }
 
 def buildDsl() {
