@@ -2,7 +2,6 @@ import os
 import sys
 from confluent_kafka.admin import AdminClient, UserScramCredentialUpsertion, ScramMechanism
 
-# Environment variables
 BOOTSTRAP = os.environ["BOOTSTRAP"]
 ADMIN_USER = os.environ["ADMIN_USER"]
 ADMIN_PASS = os.environ["ADMIN_PASS"]
@@ -19,21 +18,22 @@ conf = {
 
 admin = AdminClient(conf)
 
-# Convert password to bytes
+# password must be bytes
 password_bytes = PASSWORD.encode("utf-8")
 
-# Create SCRAM credential — only 4 positional arguments
+# Create the SCRAM credential; do NOT pass salt (let Kafka generate it)
 scram = UserScramCredentialUpsertion(
-    NEW_USER,                     # username
-    ScramMechanism.SCRAM_SHA_512, # mechanism
-    password_bytes,               # password as bytes
-    4096                           # iterations
+    NEW_USER,
+    ScramMechanism.SCRAM_SHA_512,
+    password_bytes,
+    4096,   # iterations
+    None    # salt=None, auto-generated
 )
 
-# Apply to Kafka
+# Apply changes
 futures = admin.alter_user_scram_credentials([scram])
 
-# Check result
+# Check results
 for user, future in futures.items():
     try:
         future.result()
