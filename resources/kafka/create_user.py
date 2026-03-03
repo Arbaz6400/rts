@@ -1,14 +1,17 @@
 import os
-import sys
-import secrets
 from confluent_kafka.admin import AdminClient, UserScramCredentialUpsertion, ScramMechanism
 
+# Environment variables from Jenkins
 BOOTSTRAP = os.environ["BOOTSTRAP"]
 ADMIN_USER = os.environ["ADMIN_USER"]
 ADMIN_PASS = os.environ["ADMIN_PASS"]
 NEW_USER = os.environ["NEW_USER"]
 PASSWORD = os.environ["PASSWORD"]
 
+# Convert password to bytes
+password_bytes = PASSWORD.encode("utf-8")
+
+# Admin client configuration
 conf = {
     "bootstrap.servers": BOOTSTRAP,
     "security.protocol": "SASL_PLAINTEXT",
@@ -19,29 +22,18 @@ conf = {
 
 admin = AdminClient(conf)
 
-# convert password to bytes
-password_bytes = PASSWORD.encode("utf-8")
-
-# generate a random 16-byte salt
-salt_bytes = secrets.token_bytes(16)
-
-# create SCRAM credential correctly using keyword arguments
+# Create the SCRAM credential — iterations and salt are optional
 scram = UserScramCredentialUpsertion(
-    NEW_USER,                      # username
-    ScramMechanism.SCRAM_SHA_512,  # mechanism
-    password_bytes,                 # password as bytes
-    iterations=4096,                # iterations as keyword
-    salt=salt_bytes                 # salt as keyword
+    NEW_USER,                     # username
+    ScramMechanism.SCRAM_SHA_512, # mechanism
+    password_bytes,               # password as bytes
+    iterations=4096               # optional, recommended
+    # salt can be left out; it will be auto-generated if None
 )
 
-# Apply changes
+# Apply the credential
 futures = admin.alter_user_scram_credentials([scram])
 
-# Check results
-for user, future in futures.items():
-    try:
-        future.result()
-        print(f"User {user} created successfully.")
-    except Exception as e:
-        print(f"Failed to create user {user}: {e}")
-        sys.exit(1)
+for user, f in futures.items():
+    f.result()  # blocks until completion
+    print(f"User {user} created successfully.")
