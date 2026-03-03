@@ -8,8 +8,11 @@ PASSWORD = os.environ['PASSWORD']
 ADMIN_USER = os.environ['ADMIN_USER']
 ADMIN_PASS = os.environ['ADMIN_PASS']
 
-# Convert password to bytes (MANDATORY)
-password_bytes = PASSWORD.encode('utf-8')
+PASSWORD = os.environ.get('PASSWORD')
+if not PASSWORD:
+    raise Exception("PASSWORD not set")
+
+password_bytes = bytes(PASSWORD, 'utf-8')
 
 # Connect to Kafka
 admin = AdminClient({
