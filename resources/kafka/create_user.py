@@ -25,13 +25,13 @@ password_bytes = PASSWORD.encode("utf-8")
 # generate a random 16-byte salt
 salt_bytes = secrets.token_bytes(16)
 
-# create SCRAM credential
+# create SCRAM credential correctly using keyword arguments
 scram = UserScramCredentialUpsertion(
     NEW_USER,                      # username
     ScramMechanism.SCRAM_SHA_512,  # mechanism
-    password_bytes,                 # password in bytes
-    salt_bytes,                     # salt in bytes
-    4096                            # iterations
+    password_bytes,                 # password as bytes
+    iterations=4096,                # iterations as keyword
+    salt=salt_bytes                 # salt as keyword
 )
 
 # Apply changes
