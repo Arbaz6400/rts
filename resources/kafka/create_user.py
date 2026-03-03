@@ -1,15 +1,17 @@
-from confluent_kafka.admin import AdminClient, UserScramCredentialUpsertion, ScramMechanism, ScramCredentialInfo
 import os
+from confluent_kafka.admin import AdminClient, UserScramCredentialUpsertion, ScramMechanism
 
-# Load env vars
-BOOTSTRAP = os.environ.get("BOOTSTRAP")
-NEW_USER = os.environ.get("NEW_USER")
-PASSWORD = os.environ.get("PASSWORD")
-ADMIN_USER = os.environ.get("ADMIN_USER")
-ADMIN_PASS = os.environ.get("ADMIN_PASS")
+# Load environment variables
+BOOTSTRAP = os.environ["BOOTSTRAP"]
+ADMIN_USER = os.environ["ADMIN_USER"]
+ADMIN_PASS = os.environ["ADMIN_PASS"]
+NEW_USER = os.environ["NEW_USER"]
+PASSWORD = os.environ["PASSWORD"]
 
-# Kafka admin client
-admin_conf = {
+# Convert password to bytes — mandatory!
+password_bytes = PASSWORD.encode("utf-8")
+
+conf = {
     "bootstrap.servers": BOOTSTRAP,
     "security.protocol": "SASL_PLAINTEXT",
     "sasl.mechanism": "SCRAM-SHA-512",
@@ -17,27 +19,21 @@ admin_conf = {
     "sasl.password": ADMIN_PASS
 }
 
-admin = AdminClient(admin_conf)
+admin = AdminClient(conf)
 
-# Password as bytes
-password_bytes = PASSWORD.encode("utf-8")
-
-# Create ScramCredentialInfo
-scram_info = ScramCredentialInfo(
-    mechanism=ScramMechanism.SCRAM_SHA_512,
-    password=password_bytes
-)
-
-# Upsertion
+# Create user SCRAM credential — positional args only
 scram_upsertion = UserScramCredentialUpsertion(
-    username=NEW_USER,
-    credential_info=scram_info
+    NEW_USER,                        # new username
+    ScramMechanism.SCRAM_SHA_512,    # mechanism
+    password_bytes                   # password as bytes
+    # You may optionally add iterations and salt here:
+    # , iterations_value, salt_bytes
 )
 
 # Send request
 futures = admin.alter_user_scram_credentials([scram_upsertion])
 
-# Wait for completion
+# Block until done
 for user, future in futures.items():
     future.result()
-    print(f"User {user} created successfully")
+    print(f"User", user, "created/updated successfully")
