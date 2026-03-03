@@ -1,6 +1,5 @@
 import os
 import sys
-import secrets
 from confluent_kafka.admin import AdminClient, UserScramCredentialUpsertion, ScramMechanism
 
 # Load environment variables
@@ -20,16 +19,12 @@ conf = {
 
 admin = AdminClient(conf)
 
-# Generate a random 16-byte salt
-salt = secrets.token_bytes(16)
-
-# Create SCRAM credential — positional arguments only
+# Create SCRAM credential — positional arguments only, no salt
 scram = UserScramCredentialUpsertion(
     NEW_USER,                        # username
     ScramMechanism.SCRAM_SHA_512,    # mechanism
     PASSWORD.encode('utf-8'),        # password as bytes
-    4096,                             # iterations
-    salt                              # salt as bytes
+    4096                              # iterations
 )
 
 futures = admin.alter_user_scram_credentials([scram])
