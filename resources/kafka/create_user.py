@@ -18,16 +18,16 @@ conf = {
 
 admin = AdminClient(conf)
 
-# password must be bytes
+# convert password to bytes
 password_bytes = PASSWORD.encode("utf-8")
 
-# Create the SCRAM credential; do NOT pass salt (let Kafka generate it)
+# Create SCRAM credential (do NOT pass salt)
 scram = UserScramCredentialUpsertion(
-    NEW_USER,
-    ScramMechanism.SCRAM_SHA_512,
-    password_bytes
+    NEW_USER,                      # username
+    ScramMechanism.SCRAM_SHA_512,  # mechanism
+    password_bytes,                 # password in bytes
+    4096                            # iterations (optional)
 )
-
 
 # Apply changes
 futures = admin.alter_user_scram_credentials([scram])
