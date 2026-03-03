@@ -1,4 +1,4 @@
-from confluent_kafka.admin import AdminClient, ScramCredentialInfo, ScramMechanism, UserScramCredentialUpsertion
+from confluent_kafka.admin import AdminClient, UserScramCredentialUpsertion, ScramMechanism
 import os
 
 # Environment variables from Jenkins
@@ -8,34 +8,29 @@ PASSWORD = os.environ['PASSWORD']
 ADMIN_USER = os.environ['ADMIN_USER']
 ADMIN_PASS = os.environ['ADMIN_PASS']
 
-# Convert password to bytes
+# Convert password to bytes (MANDATORY)
 password_bytes = PASSWORD.encode('utf-8')
 
 # Connect to Kafka
 admin = AdminClient({
     "bootstrap.servers": BOOTSTRAP,
-    "sasl.mechanism": "PLAIN",
     "security.protocol": "SASL_PLAINTEXT",
+    "sasl.mechanism": "SCRAM-SHA-512",
     "sasl.username": ADMIN_USER,
     "sasl.password": ADMIN_PASS
 })
-# This must be passed as positional args
-scram_info = ScramCredentialInfo(
-    ScramMechanism.SCRAM_SHA_512,
-    iterations
-)
-# Create SCRAM credentials for the new user
+
+# Create SCRAM credentials (correct constructor for your version)
 scram_upsertion = UserScramCredentialUpsertion(
-    NEW_USER,     # username
-    scram_info,    # scram credential info object
-    password_bytes
-
+    NEW_USER,
+    password_bytes,
+    ScramMechanism.SCRAM_SHA_512
 )
 
-# Execute the user creation
+# Execute user creation
 futures = admin.alter_user_scram_credentials([scram_upsertion])
 
-# Wait for operation to finish
+# Wait for completion
 for future in futures.values():
     future.result()
 
