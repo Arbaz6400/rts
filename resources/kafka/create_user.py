@@ -22,6 +22,7 @@ admin = AdminClient({
 # This must be passed as positional args
 scram_info = ScramCredentialInfo(
     ScramMechanism.SCRAM_SHA_512,
+    iterations
 )
 # Create SCRAM credentials for the new user
 scram_upsertion = UserScramCredentialUpsertion(
