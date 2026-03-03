@@ -9,17 +9,16 @@ def call() {
         }
 
         stages {
-            stage('Generate Password') {
-                steps {
-                    script {
-                        // Use PowerShell to generate random password
-                        env.GENERATED_PASSWORD = bat(
-                            script: "powershell -Command \"[Convert]::ToBase64String((New-Object byte[] 16 | %{Get-Random -Minimum 0 -Maximum 256}))\"",
-                            returnStdout: true
-                        ).trim()
-                    }
-                }
-            }
+stage('Generate Password') {
+    steps {
+        script {
+            env.GENERATED_PASSWORD = bat(
+                script: '''python -c "import secrets, base64; print(base64.b64encode(secrets.token_bytes(16)).decode())"''',
+                returnStdout: true
+            ).trim()
+        }
+    }
+}
 
             stage('Load Python Script') {
                 steps {
