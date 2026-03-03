@@ -19,7 +19,11 @@ admin = AdminClient({
     "sasl.username": ADMIN_USER,
     "sasl.password": ADMIN_PASS
 })
-
+# This must be passed as positional args
+scram_info = ScramCredentialInfo(
+    ScramMechanism.SCRAM_SHA_512,
+    password_bytes
+)
 # Create SCRAM credentials for the new user
 scram_upsertion = UserScramCredentialUpsertion(
     NEW_USER,     # username
