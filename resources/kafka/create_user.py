@@ -1,4 +1,4 @@
-from confluent_kafka.admin import AdminClient, UserScramCredentialUpsertion, ScramMechanism
+from confluent_kafka.admin import AdminClient, ScramCredentialInfo, ScramMechanism, UserScramCredentialUpsertion
 import os
 
 # Environment variables from Jenkins
