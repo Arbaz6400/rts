@@ -22,7 +22,7 @@ admin = AdminClient({
 
 # Create SCRAM credentials for the new user
 scram_upsertion = UserScramCredentialUpsertion(
-    username=NEW_USER,
+    NEW_USER,     # username
     mechanism=ScramMechanism.SCRAM_SHA_512,
     password=password_bytes  # must be bytes!
 )
