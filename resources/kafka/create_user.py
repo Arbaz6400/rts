@@ -26,7 +26,7 @@ scram_info = ScramCredentialInfo(
 # Create SCRAM credentials for the new user
 scram_upsertion = UserScramCredentialUpsertion(
     NEW_USER,     # username
-    scram_info    # scram credential info object
+    scram_info,    # scram credential info object
     password_bytes
 
 )
