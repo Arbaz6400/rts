@@ -20,12 +20,12 @@ conf = {
 
 admin = AdminClient(conf)
 
-# Convert password to bytes as required by confluent_kafka
+# Correct positional arguments: username, mechanism, password (bytes), iterations
 scram = UserScramCredentialUpsertion(
-    name=NEW_USER,
-    mechanism=ScramMechanism.SCRAM_SHA_512,
-    password=PASSWORD.encode('utf-8'),  # <--- encode here
-    iterations=4096
+    NEW_USER,
+    ScramMechanism.SCRAM_SHA_512,
+    PASSWORD.encode('utf-8'),  # password must be bytes
+    4096
 )
 
 # Apply the user creation
