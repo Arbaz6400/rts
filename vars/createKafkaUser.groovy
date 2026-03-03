@@ -25,7 +25,11 @@ stage('Generate Password') {
                     }
                 }
             }
-
+stage('Check Python') {
+    steps {
+        bat 'python --version'
+    }
+}
             stage('Create Kafka User') {
                 steps {
                     withCredentials([
