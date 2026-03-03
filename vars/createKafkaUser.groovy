@@ -12,8 +12,9 @@ def call() {
             stage('Generate Password') {
                 steps {
                     script {
-                        env.GENERATED_PASSWORD = sh(
-                            script: "openssl rand -base64 16",
+                        // Use PowerShell to generate random password
+                        env.GENERATED_PASSWORD = bat(
+                            script: "powershell -Command \"[Convert]::ToBase64String((New-Object byte[] 16 | %{Get-Random -Minimum 0 -Maximum 256}))\"",
                             returnStdout: true
                         ).trim()
                     }
@@ -38,13 +39,14 @@ def call() {
                             passwordVariable: 'ADMIN_PASS'
                         )
                     ]) {
-                        sh """
-                            export PATH=\$HOME/.local/bin:\$PATH
-                            export BOOTSTRAP=${env.BOOTSTRAP}
-                            export NEW_USER=${env.NEW_USER}
-                            export PASSWORD=${env.GENERATED_PASSWORD}
+                        bat """
+                            set BOOTSTRAP=${env.BOOTSTRAP}
+                            set NEW_USER=${env.NEW_USER}
+                            set PASSWORD=${env.GENERATED_PASSWORD}
+                            set ADMIN_USER=${env.ADMIN_USER}
+                            set ADMIN_PASS=${env.ADMIN_PASS}
 
-                            python3 create_user.py
+                            python create_user.py
                         """
                     }
                 }
