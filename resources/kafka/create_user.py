@@ -1,7 +1,7 @@
 import os
 from confluent_kafka.admin import AdminClient, ScramCredentialInfo, ScramMechanism
 
-# Environment variables
+# Read environment variables
 BOOTSTRAP = os.environ["BOOTSTRAP"]
 ADMIN_USER = os.environ["ADMIN_USER"]
 ADMIN_PASS = os.environ["ADMIN_PASS"]
@@ -11,7 +11,7 @@ PASSWORD = os.environ["PASSWORD"]
 # Convert password to bytes
 password_bytes = PASSWORD.encode("utf-8")
 
-# Admin client config
+# Kafka Admin client config
 conf = {
     "bootstrap.servers": BOOTSTRAP,
     "security.protocol": "SASL_PLAINTEXT",
@@ -22,17 +22,17 @@ conf = {
 
 admin = AdminClient(conf)
 
-# Create SCRAM credential info
+# Create SCRAM credential info (positional arguments!)
 scram_info = ScramCredentialInfo(
-    mechanism=ScramMechanism.SCRAM_SHA_512,
-    password=password_bytes
-    # iterations and salt are optional; defaults are used
+    ScramMechanism.SCRAM_SHA_512,  # mechanism
+    password_bytes                  # password as bytes
+    # iterations and salt are optional; leave them None to use defaults
 )
 
-# Alter user SCRAM credentials
+# alter_user_scram_credentials expects a list of (username, ScramCredentialInfo) tuples
 futures = admin.alter_user_scram_credentials([(NEW_USER, scram_info)])
 
-# Wait for result
+# Wait for futures to complete
 for user, f in futures.items():
     f.result()
     print(f"User {user} created successfully.")
