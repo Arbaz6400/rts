@@ -16,11 +16,7 @@ ADMIN_PASS = os.environ['ADMIN_PASS']
 password_bytes = PASSWORD.encode("utf-8")
 
 admin = AdminClient({
-    "bootstrap.servers": BOOTSTRAP,
-    "security.protocol": "SASL_PLAINTEXT",
-    "sasl.mechanism": "SCRAM-SHA-512",
-    "sasl.username": ADMIN_USER,
-    "sasl.password": ADMIN_PASS
+    "bootstrap.servers": BOOTSTRAP
 })
 
 # ✅ Create credential info object
