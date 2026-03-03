@@ -28,7 +28,6 @@ scram_upsertion = UserScramCredentialUpsertion(
     NEW_USER,
     ScramMechanism.SCRAM_SHA_512,
     password_bytes
-
 )
 
 # Execute user creation
