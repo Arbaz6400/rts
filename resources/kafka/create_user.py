@@ -1,5 +1,5 @@
 import os
-from confluent_kafka.admin import AdminClient, ScramCredentialInfo, ScramMechanism
+from confluent_kafka.admin import AdminClient, UserScramCredentialUpsertion, ScramMechanism
 
 # Read environment variables
 BOOTSTRAP = os.environ["BOOTSTRAP"]
@@ -22,17 +22,18 @@ conf = {
 
 admin = AdminClient(conf)
 
-# Create SCRAM credential info (positional arguments!)
-scram_info = ScramCredentialInfo(
-    ScramMechanism.SCRAM_SHA_512,  # mechanism
-    password_bytes                  # password as bytes
-    # iterations and salt are optional; leave them None to use defaults
+# Create UserScramCredentialUpsertion object (this is the correct type)
+scram = UserScramCredentialUpsertion(
+    NEW_USER,                 # username
+    ScramMechanism.SCRAM_SHA_512,
+    password_bytes
+    # iterations and salt are optional; defaults are fine
 )
 
-# alter_user_scram_credentials expects a list of (username, ScramCredentialInfo) tuples
-futures = admin.alter_user_scram_credentials([(NEW_USER, scram_info)])
+# Pass a list of UserScramCredentialUpsertion objects to alter_user_scram_credentials
+futures = admin.alter_user_scram_credentials([scram])
 
-# Wait for futures to complete
+# Wait for results
 for user, f in futures.items():
     f.result()
     print(f"User {user} created successfully.")
