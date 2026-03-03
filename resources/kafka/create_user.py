@@ -23,13 +23,13 @@ admin = AdminClient(conf)
 # Generate a random 16-byte salt
 salt = secrets.token_bytes(16)
 
-# Create SCRAM credential (all positional arguments)
+# Create SCRAM credential — note iterations and salt are keyword args
 scram = UserScramCredentialUpsertion(
-    NEW_USER,
-    ScramMechanism.SCRAM_SHA_512,
-    PASSWORD.encode('utf-8'),  # password must be bytes
-    4096,
-    salt  # explicitly pass salt as bytes
+    username=NEW_USER,
+    mechanism=ScramMechanism.SCRAM_SHA_512,
+    password=PASSWORD.encode('utf-8'),
+    iterations=4096,
+    salt=salt
 )
 
 futures = admin.alter_user_scram_credentials([scram])
