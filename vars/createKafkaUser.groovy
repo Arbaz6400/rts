@@ -21,7 +21,7 @@ stage('Generate Password') {
                 steps {
                     script {
                         writeFile file: 'create_user.py',
-                            text: libraryResource('kafka/create_user.py')
+                            text: libraryResource('src/com/org/config/create_user.py')
                     }
                 }
             }
