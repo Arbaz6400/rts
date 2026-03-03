@@ -25,10 +25,9 @@ password_bytes = PASSWORD.encode("utf-8")
 scram = UserScramCredentialUpsertion(
     NEW_USER,
     ScramMechanism.SCRAM_SHA_512,
-    password_bytes,
-    4096,   # iterations
-    None    # salt=None, auto-generated
+    password_bytes
 )
+
 
 # Apply changes
 futures = admin.alter_user_scram_credentials([scram])
