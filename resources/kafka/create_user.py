@@ -1,7 +1,7 @@
 import os
-from confluent_kafka.admin import AdminClient, UserScramCredentialUpsertion, ScramMechanism
+from confluent_kafka.admin import AdminClient, ScramMechanism, ScramCredentialInfo, UserScramCredentialUpsertion
 
-# Read environment variables
+# Environment variables
 BOOTSTRAP = os.environ["BOOTSTRAP"]
 ADMIN_USER = os.environ["ADMIN_USER"]
 ADMIN_PASS = os.environ["ADMIN_PASS"]
@@ -11,7 +11,7 @@ PASSWORD = os.environ["PASSWORD"]
 # Convert password to bytes
 password_bytes = PASSWORD.encode("utf-8")
 
-# Kafka Admin client config
+# Admin client
 conf = {
     "bootstrap.servers": BOOTSTRAP,
     "security.protocol": "SASL_PLAINTEXT",
@@ -19,21 +19,24 @@ conf = {
     "sasl.username": ADMIN_USER,
     "sasl.password": ADMIN_PASS
 }
-
 admin = AdminClient(conf)
 
-# Create UserScramCredentialUpsertion object (this is the correct type)
-scram = UserScramCredentialUpsertion(
-    NEW_USER,                 # username
-    ScramMechanism.SCRAM_SHA_512,
-    password_bytes
-    # iterations and salt are optional; defaults are fine
+# Create ScramCredentialInfo object
+scram_info = ScramCredentialInfo(
+    mechanism=ScramMechanism.SCRAM_SHA_512,
+    password=password_bytes
 )
 
-# Pass a list of UserScramCredentialUpsertion objects to alter_user_scram_credentials
-futures = admin.alter_user_scram_credentials([scram])
+# Create UserScramCredentialUpsertion object
+scram_upsertion = UserScramCredentialUpsertion(
+    username=NEW_USER,
+    credential_info=scram_info
+)
 
-# Wait for results
+# Pass list of upsertions to alter_user_scram_credentials
+futures = admin.alter_user_scram_credentials([scram_upsertion])
+
+# Wait for completion
 for user, f in futures.items():
     f.result()
     print(f"User {user} created successfully.")
