@@ -26,8 +26,9 @@ admin = AdminClient({
 # Create SCRAM credentials (correct constructor for your version)
 scram_upsertion = UserScramCredentialUpsertion(
     NEW_USER,
-    password_bytes,
-    ScramMechanism.SCRAM_SHA_512
+    ScramMechanism.SCRAM_SHA_512,
+    password_bytes
+
 )
 
 # Execute user creation
