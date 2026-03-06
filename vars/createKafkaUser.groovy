@@ -25,6 +25,15 @@ stage('Generate Password') {
             //         }
             //     }
             // }
+            stage('Load Python Script') {
+    steps {
+        script {
+            def scriptPath = "${pwd()}@libs/quality-lib/scripts/create_user.py"
+            def content = readFile(scriptPath)
+            writeFile file: 'create_user.py', text: content
+        }
+    }
+}
 stage('Check Python') {
     steps {
         bat 'where python'
