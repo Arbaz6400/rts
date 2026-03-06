@@ -17,14 +17,14 @@ stage('Generate Password') {
     }
 }
 
-            stage('Load Python Script') {
-                steps {
-                    script {
-                        writeFile file: 'create_user.py',
-                            text: libraryResource('kafka/create_user.py')
-                    }
-                }
-            }
+            // stage('Load Python Script') {
+            //     steps {
+            //         script {
+            //             writeFile file: 'create_user.py',
+            //                 text: libraryResource('kafka/create_user.py')
+            //         }
+            //     }
+            // }
 stage('Check Python') {
     steps {
         bat 'where python'
@@ -46,8 +46,7 @@ stage('Check Python') {
                             set PASSWORD=${env.GENERATED_PASSWORD}
                             set ADMIN_USER=${env.ADMIN_USER}
                             set ADMIN_PASS=${env.ADMIN_PASS}
-
-                            python create_user.py
+                            python scripts\\create_user.py
                         """
                     }
                 }
